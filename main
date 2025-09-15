@@ -1,301 +1,313 @@
-import 'dart:async';
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async'; // Importa a biblioteca 'dart:async' para funcionalidades assíncronas como Future e Timer.
+import 'package:flutter/material.dart'; // Importa o pacote fundamental do Flutter para construção de UI.
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // Importa o pacote Riverpod para gerenciamento de estado.
 
 // ------------------------------
-// Data Models
+// Data Models (Modelos de Dados)
 // ------------------------------
 
-class UserProfile {
-  final int id;
-  final String name;
-  final String email;
+class UserProfile { // Define a classe UserProfile para representar o perfil de um usuário.
+  final int id; // Declara uma propriedade final 'id' do tipo inteiro.
+  final String name; // Declara uma propriedade final 'name' do tipo String.
+  final String email; // Declara uma propriedade final 'email' do tipo String.
 
-  UserProfile({required this.id, required this.name, required this.email});
+  UserProfile({required this.id, required this.name, required this.email}); // Construtor da classe UserProfile, com todos os campos obrigatórios.
 }
 
-class Product {
-  final int id;
-  String name;
-  String description;
-  double price;
-  bool rxOnly; // precisa de receita?
-  String? imageUrl;
-  final String category; // New: e.g., 'Remédios', 'Rações', 'Brinquedos'
+class Product { // Define a classe Product para representar um produto.
+  final int id; // Declara uma propriedade final 'id' do tipo inteiro.
+  String name; // Declara uma propriedade 'name' do tipo String.
+  String description; // Declara uma propriedade 'description' do tipo String.
+  double price; // Declara uma propriedade 'price' do tipo double.
+  bool rxOnly; // Declara uma propriedade 'rxOnly' (somente com receita) do tipo booleano.
+  String? imageUrl; // Declara uma propriedade 'imageUrl' do tipo String opcional (pode ser nula).
+  final String category; // Declara uma propriedade final 'category' do tipo String.
 
-  Product({
-    required this.id,
-    required this.name,
-    required this.description,
-    required this.price,
-    this.rxOnly = false,
-    this.imageUrl,
-    required this.category,
+  Product({ // Construtor da classe Product.
+    required this.id, // O id é obrigatório.
+    required this.name, // O nome é obrigatório.
+    required this.description, // A descrição é obrigatória.
+    required this.price, // O preço é obrigatório.
+    this.rxOnly = false, // rxOnly tem um valor padrão de false.
+    this.imageUrl, // imageUrl é opcional.
+    required this.category, // A categoria é obrigatória.
   });
 
-  Product copyWith({
-    int? id,
-    String? name,
-    String? description,
-    double? price,
-    bool? rxOnly,
-    String? imageUrl,
-    String? category,
-  }) =>
-      Product(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        description: description ?? this.description,
-        price: price ?? this.price,
-        rxOnly: rxOnly ?? this.rxOnly,
-        imageUrl: imageUrl ?? this.imageUrl,
-        category: category ?? this.category,
+  Product copyWith({ // Método copyWith para criar uma nova instância de Product com valores alterados.
+    int? id, // id é opcional para cópia.
+    String? name, // nome é opcional para cópia.
+    String? description, // descrição é opcional para cópia.
+    double? price, // preço é opcional para cópia.
+    bool? rxOnly, // rxOnly é opcional para cópia.
+    String? imageUrl, // imageUrl é opcional para cópia.
+    String? category, // categoria é opcional para cópia.
+  }) => // Retorna uma nova instância de Product.
+      Product( // Chama o construtor de Product.
+        id: id ?? this.id, // Usa o novo id se fornecido, senão usa o id atual.
+        name: name ?? this.name, // Usa o novo nome se fornecido, senão usa o nome atual.
+        description: description ?? this.description, // Usa a nova descrição se fornecida, senão usa a descrição atual.
+        price: price ?? this.price, // Usa o novo preço se fornecido, senão usa o preço atual.
+        rxOnly: rxOnly ?? this.rxOnly, // Usa o novo rxOnly se fornecido, senão usa o rxOnly atual.
+        imageUrl: imageUrl ?? this.imageUrl, // Usa a nova imageUrl se fornecida, senão usa a imageUrl atual.
+        category: category ?? this.category, // Usa a nova category se fornecida, senão usa a category atual.
       );
 }
 
-class AuthState {
-  final bool isLoading;
-  final bool isAuthed;
-  final String? error; // General error message for auth operations
-  final bool? isEmailError; // True if 'error' is specific to email, false if general/password-related
-  final UserProfile? currentUser; // Stores the profile of the currently logged-in user
+class AuthState { // Define a classe AuthState para representar o estado da autenticação.
+  final bool isLoading; // Indica se uma operação de autenticação está em andamento.
+  final bool isAuthed; // Indica se o usuário está autenticado.
+  final String? error; // General error message for auth operations // Mensagem de erro geral para operações de autenticação, pode ser nula.
+  final bool? isEmailError; // True if 'error' is specific to email, false if general/password-related // Indica se o erro é específico do email.
+  final UserProfile? currentUser; // Stores the profile of the currently logged-in user // Armazena o perfil do usuário logado, pode ser nulo.
 
-  const AuthState({
-    this.isLoading = false,
-    this.isAuthed = false,
-    this.error,
-    this.isEmailError,
-    this.currentUser,
+  const AuthState({ // Construtor constante da classe AuthState.
+    this.isLoading = false, // isLoading tem um valor padrão de false.
+    this.isAuthed = false, // isAuthed tem um valor padrão de false.
+    this.error, // error é opcional.
+    this.isEmailError, // isEmailError é opcional.
+    this.currentUser, // currentUser é opcional.
   });
 
-  AuthState copyWith({
-    bool? isLoading,
-    bool? isAuthed,
-    String? error, // Nullable to explicitly clear
-    bool? isEmailError, // Nullable to explicitly clear or change
-    UserProfile? currentUser, // Nullable to explicitly clear or change
-  }) =>
-      AuthState(
-        isLoading: isLoading ?? this.isLoading,
-        isAuthed: isAuthed ?? this.isAuthed,
-        error: error,
-        isEmailError: isEmailError,
-        currentUser: currentUser,
+  AuthState copyWith({ // Método copyWith para criar uma nova instância de AuthState com valores alterados.
+    bool? isLoading, // isLoading é opcional para cópia.
+    bool? isAuthed, // isAuthed é opcional para cópia.
+    String? error, // Nullable to explicitly clear // error é opcional para cópia e pode ser nulo para limpar.
+    bool? isEmailError, // Nullable to explicitly clear or change // isEmailError é opcional para cópia e pode ser nulo para limpar.
+    UserProfile? currentUser, // Nullable to explicitly clear or change // currentUser é opcional para cópia e pode ser nulo para limpar.
+  }) => // Retorna uma nova instância de AuthState.
+      AuthState( // Chama o construtor de AuthState.
+        isLoading: isLoading ?? this.isLoading, // Usa o novo isLoading se fornecido, senão usa o isLoading atual.
+        isAuthed: isAuthed ?? this.isAuthed, // Usa o novo isAuthed se fornecido, senão usa o isAuthed atual.
+        error: error, // Usa o novo error, mesmo que seja nulo (para limpar).
+        isEmailError: isEmailError, // Usa o novo isEmailError, mesmo que seja nulo.
+        currentUser: currentUser, // Usa o novo currentUser, mesmo que seja nulo.
       );
 }
 
+// Helper class to store registered user details (password + profile)
+// Moved out of AuthController to be a top-level private class
+class _RegisteredUserDetails { // Classe auxiliar privada para armazenar detalhes de usuários registrados.
+  final String password; // A senha do usuário.
+  final UserProfile userProfile; // O perfil do usuário.
+
+  _RegisteredUserDetails({required this.password, required this.userProfile}); // Construtor da classe auxiliar.
+}
+
 // ------------------------------
-// State Notifiers (Controllers)
+// State Notifiers (Controllers) // Notificadores de Estado (Controladores)
 // ------------------------------
 
-class AuthController extends StateNotifier<AuthState> {
-  AuthController() : super(const AuthState());
+class AuthController extends StateNotifier<AuthState> { // Define AuthController como um StateNotifier que gerencia AuthState.
+  AuthController() : super(const AuthState()); // Construtor que inicializa o estado com um AuthState padrão.
 
-  static const String _fixedUser = 'admin@vet.com';
-  static const String _fixedPass = '123456';
+  static const String _fixedUserEmail = 'admin@vet.com'; // Email de usuário fixo (admin).
+  static const String _fixedUserPass = '123456'; // Senha de usuário fixo (admin).
+  static const String _fixedUserName = 'Admin Vet'; // Nome de usuário fixo (admin).
 
-  // Store registered users (email -> password)
-  final Map<String, String> _registeredUsers = {};
+  // Store registered users (email -> _RegisteredUserDetails)
+  final Map<String, _RegisteredUserDetails> _registeredUsersDetails = {}; // Mapa para armazenar detalhes de usuários registrados.
 
-  Future<void> login(String user, String pass) async {
-    state = state.copyWith(isLoading: true, error: null, isEmailError: null, currentUser: null); // Clear previous errors and user
-    await Future.delayed(const Duration(milliseconds: 800)); // mock delay
+  Future<void> login(String email, String pass) async { // Método para realizar o login do usuário.
+    state = state.copyWith(isLoading: true, error: null, isEmailError: null, currentUser: null); // Clear previous errors and user // Define o estado como carregando, limpa erros e usuário anterior.
+    await Future.delayed(const Duration(milliseconds: 800)); // mock delay // Adiciona um atraso simulado de 800ms.
 
-    bool isAuthenticated = false;
-    UserProfile? userProfile;
+    bool isAuthenticated = false; // Variável para controlar se o usuário foi autenticado.
+    UserProfile? userProfile; // Variável para armazenar o perfil do usuário, pode ser nula.
 
     // Check fixed admin user
-    if (user == _fixedUser && pass == _fixedPass) {
-      isAuthenticated = true;
-      userProfile = UserProfile(id: 1, name: 'Admin Vet', email: user);
+    if (email == _fixedUserEmail && pass == _fixedUserPass) { // Verifica se as credenciais correspondem ao admin fixo.
+      isAuthenticated = true; // Define isAuthenticated como true.
+      userProfile = UserProfile(id: 1, name: _fixedUserName, email: email); // Cria um perfil para o admin.
     }
     // Check registered users
-    else if (_registeredUsers.containsKey(user) && _registeredUsers[user] == pass) {
-      isAuthenticated = true;
-      // Generate a simple user profile for registered users
-      userProfile = UserProfile(id: user.hashCode.abs(), name: 'Usuário ${user.split('@').first}', email: user);
+    else if (_registeredUsersDetails.containsKey(email) && _registeredUsersDetails[email]!.password == pass) { // Verifica se as credenciais correspondem a um usuário registrado.
+      isAuthenticated = true; // Define isAuthenticated como true.
+      userProfile = _registeredUsersDetails[email]!.userProfile; // Obtém o perfil do usuário registrado.
     }
 
-    if (isAuthenticated) {
-      state = state.copyWith(
-          isAuthed: true, isLoading: false, error: null, isEmailError: null, currentUser: userProfile);
-    } else {
+    if (isAuthenticated) { // Se o usuário foi autenticado.
+      state = state.copyWith( // Atualiza o estado.
+          isAuthed: true, isLoading: false, error: null, isEmailError: null, currentUser: userProfile); // Define como autenticado, para de carregar, limpa erros e define o usuário atual.
+    } else { // Se a autenticação falhou.
       // As per prompt "Mostre o erro na senha.", this general error will be shown in the password field.
-      state = state.copyWith(
-          isAuthed: false, isLoading: false, error: 'Cadastro inválido.', isEmailError: false, currentUser: null);
+      state = state.copyWith( // Atualiza o estado.
+          isAuthed: false, isLoading: false, error: 'Cadastro inválido.', isEmailError: false, currentUser: null); // Define como não autenticado, para de carregar, define a mensagem de erro e indica que não é um erro de email.
     }
   }
 
-  Future<void> register(String user, String pass) async {
-    state = state.copyWith(isLoading: true, error: null, isEmailError: null, currentUser: null); // Clear previous errors
-    await Future.delayed(const Duration(milliseconds: 1200)); // mock delay for registration
+  Future<void> register(String email, String password, String name) async { // Método para registrar um novo usuário.
+    state = state.copyWith(isLoading: true, error: null, isEmailError: null, currentUser: null); // Clear previous errors // Define o estado como carregando, limpa erros e usuário anterior.
+    await Future.delayed(const Duration(milliseconds: 1200)); // mock delay for registration // Adiciona um atraso simulado de 1200ms para registro.
 
     // Check if user already exists (admin or a previously registered user)
-    if (_registeredUsers.containsKey(user) || user == _fixedUser) {
+    if (_registeredUsersDetails.containsKey(email) || email == _fixedUserEmail) { // Verifica se o email já está cadastrado (admin ou outro usuário).
       // This is an email-specific error
-      state = state.copyWith(isLoading: false, error: 'Este email já está cadastrado.', isEmailError: true);
-      return;
+      state = state.copyWith(isLoading: false, error: 'Este email já está cadastrado.', isEmailError: true); // Define o estado como não carregando, define o erro e indica que é um erro de email.
+      return; // Sai da função.
     }
 
-    // Register user
-    _registeredUsers[user] = pass;
+    // Create UserProfile for the new registration
+    final UserProfile newUserProfile = UserProfile(id: email.hashCode.abs(), name: name, email: email); // Cria um novo perfil de usuário.
+    _registeredUsersDetails[email] = _RegisteredUserDetails(password: password, userProfile: newUserProfile); // Armazena os detalhes do novo usuário.
+
     // Do not auto-login after registration, just clear error and stop loading.
-    state = state.copyWith(isLoading: false, error: null, isEmailError: null);
+    state = state.copyWith(isLoading: false, error: null, isEmailError: null); // Para de carregar e limpa erros após o registro.
   }
 
-  void logout() {
-    state = const AuthState(); // Reset to initial unauthenticated state
+  void logout() { // Método para realizar o logout.
+    state = const AuthState(); // Redefine o estado para o estado inicial (não autenticado).
   }
 }
 
-class ProductController extends StateNotifier<List<Product>> {
-  ProductController() : super(_initialProducts); // Initialize with dummy data
+class ProductController extends StateNotifier<List<Product>> { // Define ProductController como um StateNotifier que gerencia uma lista de Product.
+  ProductController() : super(_initialProducts); // Initialize with dummy data // Construtor que inicializa o estado com dados de produtos iniciais.
 
-  static final List<Product> _initialProducts = [
-    Product(
-      id: 101,
-      name: 'Anti-pulgas PetGuard',
-      description: 'Proteção eficaz contra pulgas e carrapatos por 3 meses.',
-      price: 89.90,
-      rxOnly: false,
-      imageUrl: 'https://images.tcdn.com.br/img/img_prod/469080/nexgard_antipulgas_caes_p_2kg_a_4kg_1_comprimido_boehringer_432_1_13f003e9c4b9fe1c31c67d5f5fb8f05f.png',
-      category: 'Remédios',
+  static final List<Product> _initialProducts = [ // Lista estática de produtos iniciais (dados de exemplo).
+    Product( // Primeiro produto.
+      id: 101, // ID do produto.
+      name: 'Anti-pulgas PetGuard', // Nome do produto.
+      description: 'Proteção eficaz contra pulgas e carrapatos por 3 meses.', // Descrição do produto.
+      price: 89.90, // Preço do produto.
+      rxOnly: false, // Não precisa de receita.
+      imageUrl: 'https://images.tcdn.com.br/img/img_prod/469080/nexgard_antipulgas_caes_p_2kg_a_4kg_1_comprimido_boehringer_432_1_13f003e9c4b9fe1c31c67d5f5fb8f05f.png', // URL da imagem.
+      category: 'Remédios', // Categoria do produto.
     ),
-    Product(
-      id: 102,
-      name: 'Antibiótico AmoxPet 250mg',
-      description: 'Antibiótico de amplo espectro para infecções bacterianas.',
-      price: 65.50,
-      rxOnly: true,
-      imageUrl: 'https://agrosolo.fbitsstatic.net/img/p/antibiotico-doxiciclina-doxitec-200mg-para-caes-16-comprimidos-89123/284689.jpg?w=700&h=700&v=202504291638',
-      category: 'Remédios',
+    Product( // Segundo produto.
+      id: 102, // ID do produto.
+      name: 'Antibiótico AmoxPet 250mg', // Nome do produto.
+      description: 'Antibiótico de amplo espectro para infecções bacterianas.', // Descrição.
+      price: 65.50, // Preço.
+      rxOnly: true, // Precisa de receita.
+      imageUrl: 'https://agrosolo.fbitsstatic.net/img/p/antibiotico-doxiciclina-doxitec-200mg-para-caes-16-comprimidos-89123/284689.jpg?w=700&h=700&v=202504291638', // URL da imagem.
+      category: 'Remédios', // Categoria.
     ),
-    Product(
-      id: 103,
-      name: 'Vermífugo CanineCare',
-      description: 'Combate vermes intestinais em cães e gatos.',
-      price: 35.00,
-      rxOnly: false,
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT8DWzbB9P9VERuidx9GwdwebtgsszUawJ9lw&s',
-      category: 'Remédios',
+    Product( // Terceiro produto.
+      id: 103, // ID do produto.
+      name: 'Vermífugo CanineCare', // Nome do produto.
+      description: 'Combate vermes intestinais em cães e gatos.', // Descrição.
+      price: 35.00, // Preço.
+      rxOnly: false, // Não precisa de receita.
+      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT8DWzbB9P9VERuidx9GwdwebtgsszUawJ9lw&s', // URL da imagem.
+      category: 'Remédios', // Categoria.
     ),
-    Product(
-      id: 201,
-      name: 'Ração Premium DogFit',
-      description: 'Alimento completo e balanceado para cães adultos.',
-      price: 120.00,
-      rxOnly: false,
-      imageUrl: 'https://www.petlove.com.br/images/products/273209/product/31027529907_Ra%C3%A7%C3%A3o_Seca_Dogfit_Gourmet_Carne_e_Vegetais_para_C%C3%A3es_Adultos_Porte_Pequeno_e_M%C3%A9dio_%281%29.jpg?1694521363',
-      category: 'Rações',
+    Product( // Quarto produto.
+      id: 201, // ID do produto.
+      name: 'Ração Premium DogFit', // Nome do produto.
+      description: 'Alimento completo e balanceado para cães adultos.', // Descrição.
+      price: 120.00, // Preço.
+      rxOnly: false, // Não precisa de receita.
+      imageUrl: 'https://www.petlove.com.br/images/products/273209/product/31027529907_Ra%C3%A7%C3%A3o_Seca_Dogfit_Gourmet_Carne_e_Vegetais_para_C%C3%A3es_Adultos_Porte_Pequeno_e_M%C3%A9dio_%281%29.jpg?1694521363', // URL da imagem.
+      category: 'Rações', // Categoria.
     ),
-    Product(
-      id: 202,
-      name: 'Ração Hipoalergênica CatHealthy',
-      description: 'Fórmula especial para gatos com sensibilidade alimentar.',
-      price: 95.00,
-      rxOnly: false,
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTowFVywEowD88opffFHbChTD67XcEtLfv1Ug&s',
-      category: 'Rações',
+    Product( // Quinto produto.
+      id: 202, // ID do produto.
+      name: 'Ração Hipoalergênica CatHealthy', // Nome do produto.
+      description: 'Fórmula especial para gatos com sensibilidade alimentar.', // Descrição.
+      price: 95.00, // Preço.
+      rxOnly: false, // Não precisa de receita.
+      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTowFVywEowD88opffFHbChTD67XcEtLfv1Ug&s', // URL da imagem.
+      category: 'Rações', // Categoria.
     ),
-    Product(
-      id: 203,
-      name: 'Petisco Dental Bites',
-      description: 'Ajuda a reduzir o tártaro e manter a higiene bucal.',
-      price: 25.00,
-      rxOnly: false,
-      imageUrl: 'https://http2.mlstatic.com/D_NQ_NP_605948-MLB47205197255_082021-O.webp',
-      category: 'Rações',
+    Product( // Sexto produto.
+      id: 203, // ID do produto.
+      name: 'Petisco Dental Bites', // Nome do produto.
+      description: 'Ajuda a reduzir o tártaro e manter a higiene bucal.', // Descrição.
+      price: 25.00, // Preço.
+      rxOnly: false, // Não precisa de receita.
+      imageUrl: 'https://http2.mlstatic.com/D_NQ_NP_605948-MLB47205197255_082021-O.webp', // URL da imagem.
+      category: 'Rações', // Categoria.
     ),
-    Product(
-      id: 301,
-      name: 'Bola Interativa PetPlay',
-      description: 'Bola com dispenser de petiscos, estimula o raciocínio.',
-      price: 45.00,
-      rxOnly: false,
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR3KF-xAehT3_BC-l6WPI866EPVZFkCwAzdtw&s',
-      category: 'Brinquedos',
+    Product( // Sétimo produto.
+      id: 301, // ID do produto.
+      name: 'Bola Interativa PetPlay', // Nome do produto.
+      description: 'Bola com dispenser de petiscos, estimula o raciocínio.', // Descrição.
+      price: 45.00, // Preço.
+      rxOnly: false, // Não precisa de receita.
+      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR3KF-xAehT3_BC-l6WPI866EPVZFkCwAzdtw&s', // URL da imagem.
+      category: 'Brinquedos', // Categoria.
     ),
-    Product(
-      id: 302,
-      name: 'Arranhador para Gatos Tower',
-      description: 'Torre de arranhar com várias plataformas e brinquedos pendurados.',
-      price: 180.00,
-      rxOnly: false,
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT18aYym3TgRzV6I58fZJ0T6cs_BfiVL1OVmQ&s',
-      category: 'Brinquedos',
+    Product( // Oitavo produto.
+      id: 302, // ID do produto.
+      name: 'Arranhador para Gatos Tower', // Nome do produto.
+      description: 'Torre de arranhar com várias plataformas e brinquedos pendurados.', // Descrição.
+      price: 180.00, // Preço.
+      rxOnly: false, // Não precisa de receita.
+      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT18aYym3TgRzV6I58fZJ0T6cs_BfiVL1OVQ&s', // URL da imagem.
+      category: 'Brinquedos', // Categoria.
     ),
-    Product(
-      id: 303,
-      name: 'Corda de Roer para Cães',
-      description: 'Brinquedo resistente para cães que adoram mastigar.',
-      price: 30.00,
-      rxOnly: false,
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRbsbIIMKHjDlNv4hP7ZSH0a9-ZQ5xGslEbPw&s',
-      category: 'Brinquedos',
+    Product( // Nono produto.
+      id: 303, // ID do produto.
+      name: 'Corda de Roer para Cães', // Nome do produto.
+      description: 'Brinquedo resistente para cães que adoram mastigar.', // Descrição.
+      price: 30.00, // Preço.
+      rxOnly: false, // Não precisa de receita.
+      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRbsbIIMKHjDlNv4hP7ZSH0a9-ZQ5xGslEbPw&s', // URL da imagem.
+      category: 'Brinquedos', // Categoria.
     ),
   ];
 
-  List<Product> getProductsByCategory(String category) {
-    return state.where((Product product) => product.category == category).toList();
+  List<Product> getProductsByCategory(String category) { // Método para obter produtos por categoria.
+    return state.where((Product product) => product.category == category).toList(); // Filtra a lista de produtos e retorna apenas os da categoria especificada.
   }
 }
 
 // ------------------------------
-// Riverpod Providers
+// Riverpod Providers (Provedores Riverpod)
 // ------------------------------
 
-final authProvider = StateNotifierProvider<AuthController, AuthState>((ref) {
-  return AuthController();
+final authProvider = StateNotifierProvider<AuthController, AuthState>((ref) { // Declara um provedor para o AuthController.
+  return AuthController(); // Retorna uma nova instância de AuthController.
 });
 
-final productProvider = StateNotifierProvider<ProductController, List<Product>>((ref) {
-  return ProductController();
+final productProvider = StateNotifierProvider<ProductController, List<Product>>((ref) { // Declara um provedor para o ProductController.
+  return ProductController(); // Retorna uma nova instância de ProductController.
 });
 
 // ------------------------------
-// UI Widgets
+// UI Widgets (Widgets da Interface do Usuário)
 // ------------------------------
 
-class RegistrationSuccessScreen extends StatelessWidget {
-  final String registeredEmail;
+class RegistrationSuccessScreen extends StatelessWidget { // Define a tela de sucesso de registro.
+  final String registeredEmail; // O email registrado.
+  final String registeredName; // New: User's registered name // O nome do usuário registrado.
 
-  const RegistrationSuccessScreen({super.key, required this.registeredEmail});
+  const RegistrationSuccessScreen({super.key, required this.registeredEmail, required this.registeredName}); // Construtor, requer email e nome.
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Cadastro Concluído'),
-        automaticallyImplyLeading: false, 
+  @override // Sobrescreve o método build.
+  Widget build(BuildContext context) { // Constrói a interface do usuário para esta tela.
+    return Scaffold( // Retorna um Scaffold, que fornece a estrutura visual básica.
+      appBar: AppBar( // Barra superior da tela.
+        title: const Text('Cadastro Concluído'), // Título da barra.
+        automaticallyImplyLeading: false, // Não exibe o botão de voltar automaticamente.
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              const Icon(Icons.check_circle_outline, size: 90, color: Colors.green),
-              const SizedBox(height: 32.0),
-              Text(
-                'Parabéns!',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: Colors.green,
-                      fontWeight: FontWeight.bold,
+      body: Center( // Centraliza o conteúdo no corpo da tela.
+        child: Padding( // Adiciona preenchimento interno.
+          padding: const EdgeInsets.all(24.0), // Preenchimento de 24.0 em todas as direções.
+          child: Column( // Organiza os widgets em uma coluna.
+            mainAxisAlignment: MainAxisAlignment.center, // Centraliza os filhos verticalmente.
+            children: <Widget>[ // Lista de filhos da coluna.
+              const Icon(Icons.check_circle_outline, size: 90, color: Colors.green), // Ícone de sucesso.
+              const SizedBox(height: 32.0), // Espaço vertical.
+              Text( // Texto de parabéns.
+                'Parabéns, $registeredName!', // Display name // Exibe o nome registrado.
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith( // Estilo do texto, copiando e modificando o headlineMedium do tema.
+                      color: Colors.green, // Cor verde.
+                      fontWeight: FontWeight.bold, // Negrito.
                     ),
-                textAlign: TextAlign.center,
+                textAlign: TextAlign.center, // Alinhamento centralizado.
               ),
-              const SizedBox(height: 16.0),
-              Text(
-                'Sua conta para "$registeredEmail" foi criada com sucesso.',
-                style: Theme.of(context).textTheme.titleMedium,
-                textAlign: TextAlign.center,
+              const SizedBox(height: 16.0), // Espaço vertical.
+              Text( // Texto de confirmação.
+                'Sua conta para "$registeredEmail" foi criada com sucesso.', // Exibe o email registrado.
+                style: Theme.of(context).textTheme.titleMedium, // Estilo do texto.
+                textAlign: TextAlign.center, // Alinhamento centralizado.
               ),
-              const SizedBox(height: 32.0),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
+              const SizedBox(height: 32.0), // Espaço vertical.
+              ElevatedButton( // Botão elevado.
+                onPressed: () { // Função chamada ao pressionar o botão.
+                  Navigator.of(context).pop(); // Volta para a tela anterior (login).
                 },
-                child: const Text('Voltar para o Login'),
+                child: const Text('Voltar para o Login'), // Texto do botão.
               ),
             ],
           ),
@@ -305,148 +317,148 @@ class RegistrationSuccessScreen extends StatelessWidget {
   }
 }
 
-class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+class LoginScreen extends ConsumerStatefulWidget { // Define a tela de login como um StatefulWidget que consome provedores Riverpod.
+  const LoginScreen({super.key}); // Construtor constante.
 
-  @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  @override // Sobrescreve o método createState.
+  ConsumerState<LoginScreen> createState() => _LoginScreenState(); // Cria e retorna o estado para esta tela.
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  String? _emailLocalError;
-  String? _passwordLocalError;
+class _LoginScreenState extends ConsumerState<LoginScreen> { // Define o estado privado da tela de login.
+  final TextEditingController _emailController = TextEditingController(); // Controlador para o campo de texto do email.
+  final TextEditingController _passwordController = TextEditingController(); // Controlador para o campo de texto da senha.
+  String? _emailLocalError; // Erro de validação local para o email.
+  String? _passwordLocalError; // Erro de validação local para a senha.
 
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
+  @override // Sobrescreve o método dispose.
+  void dispose() { // Libera os recursos dos controladores.
+    _emailController.dispose(); // Descarta o controlador de email.
+    _passwordController.dispose(); // Descarta o controlador de senha.
+    super.dispose(); // Chama o dispose da superclasse.
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final AuthState authState = ref.watch(authProvider);
+  @override // Sobrescreve o método build.
+  Widget build(BuildContext context) { // Constrói a interface do usuário para esta tela.
+    final AuthState authState = ref.watch(authProvider); // Observa as mudanças no estado de autenticação.
 
-    String? emailAuthError;
-    String? passwordAuthError;
+    String? emailAuthError; // Variável para armazenar erro de autenticação do email.
+    String? passwordAuthError; // Variável para armazenar erro de autenticação da senha.
 
-    if (authState.error != null && !authState.isLoading && !authState.isAuthed) {
-      if (authState.isEmailError == true) {
-        emailAuthError = authState.error;
-      } else if (authState.isEmailError == false) {
-        passwordAuthError = authState.error;
+    if (authState.error != null && !authState.isLoading && !authState.isAuthed) { // Se houver um erro de autenticação e não estiver carregando e não estiver autenticado.
+      if (authState.isEmailError == true) { // Se o erro for específico do email.
+        emailAuthError = authState.error; // Atribui o erro ao email.
+      } else if (authState.isEmailError == false) { // Se o erro não for específico do email (geralmente da senha).
+        passwordAuthError = authState.error; // Atribui o erro à senha.
       }
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Entrar no Sistema'),
+    return Scaffold( // Retorna um Scaffold.
+      appBar: AppBar( // Barra superior da tela.
+        title: const Text('Entrar no Sistema'), // Título da barra.
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              const Icon(Icons.pets, size: 90, color: Colors.pinkAccent),
-              const SizedBox(height: 32.0),
-              Text(
-                'Bem-vindo ao VetApp',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: Colors.pinkAccent,
-                      fontWeight: FontWeight.bold,
+      body: Center( // Centraliza o conteúdo.
+        child: SingleChildScrollView( // Permite rolar o conteúdo se for muito grande.
+          padding: const EdgeInsets.all(24.0), // Adiciona preenchimento.
+          child: Column( // Organiza os widgets em uma coluna.
+            mainAxisAlignment: MainAxisAlignment.center, // Centraliza os filhos verticalmente.
+            children: <Widget>[ // Lista de filhos da coluna.
+              const Icon(Icons.pets, size: 90, color: Colors.pinkAccent), // Ícone de pets.
+              const SizedBox(height: 32.0), // Espaço vertical.
+              Text( // Texto de boas-vindas.
+                'Bem-vindo ao VetApp', // Texto.
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith( // Estilo do texto.
+                      color: Colors.pinkAccent, // Cor pinkAccent.
+                      fontWeight: FontWeight.bold, // Negrito.
                     ),
-                textAlign: TextAlign.center,
+                textAlign: TextAlign.center, // Alinhamento centralizado.
               ),
-              const SizedBox(height: 32.0),
-              TextField(
-                controller: _emailController,
-                onChanged: (_) {
-                  if (_emailLocalError != null) {
-                    setState(() => _emailLocalError = null);
+              const SizedBox(height: 32.0), // Espaço vertical.
+              TextField( // Campo de texto para o email.
+                controller: _emailController, // Associa o controlador de email.
+                onChanged: (_) { // Chamado quando o texto muda.
+                  if (_emailLocalError != null) { // Se houver um erro local.
+                    setState(() => _emailLocalError = null); // Limpa o erro local.
                   }
                 },
-                decoration: InputDecoration(
-                  labelText: 'Email',
-                  prefixIcon: const Icon(Icons.email),
-                  hintText: 'admin@vet.com',
-                  errorText: _emailLocalError ?? emailAuthError,
+                decoration: InputDecoration( // Decoração do campo de texto.
+                  labelText: 'Email', // Rótulo.
+                  prefixIcon: const Icon(Icons.email), // Ícone prefixo.
+                  hintText: 'admin@vet.com', // Texto de dica.
+                  errorText: _emailLocalError ?? emailAuthError, // Texto de erro (local ou de autenticação).
                 ),
-                keyboardType: TextInputType.emailAddress,
+                keyboardType: TextInputType.emailAddress, // Tipo de teclado para email.
               ),
-              const SizedBox(height: 16.0),
-              TextField(
-                controller: _passwordController,
-                onChanged: (_) {
-                  if (_passwordLocalError != null) {
-                    setState(() => _passwordLocalError = null);
+              const SizedBox(height: 16.0), // Espaço vertical.
+              TextField( // Campo de texto para a senha.
+                controller: _passwordController, // Associa o controlador de senha.
+                onChanged: (_) { // Chamado quando o texto muda.
+                  if (_passwordLocalError != null) { // Se houver um erro local.
+                    setState(() => _passwordLocalError = null); // Limpa o erro local.
                   }
                 },
-                decoration: InputDecoration(
-                  labelText: 'Senha',
-                  prefixIcon: const Icon(Icons.lock),
-                  hintText: '123456',
-                  errorText: _passwordLocalError ?? passwordAuthError,
+                decoration: InputDecoration( // Decoração do campo de texto.
+                  labelText: 'Senha', // Rótulo.
+                  prefixIcon: const Icon(Icons.lock), // Ícone prefixo.
+                  hintText: '123456', // Texto de dica.
+                  errorText: _passwordLocalError ?? passwordAuthError, // Texto de erro (local ou de autenticação).
                 ),
-                obscureText: true,
+                obscureText: true, // Oculta o texto para senha.
               ),
-              const SizedBox(height: 32.0),
-              if (authState.isLoading)
-                const CircularProgressIndicator()
-              else
-                ElevatedButton(
-                  onPressed: () {
-                    final String email = _emailController.text.trim();
-                    final String password = _passwordController.text.trim();
+              const SizedBox(height: 32.0), // Espaço vertical.
+              if (authState.isLoading) // Se estiver carregando.
+                const CircularProgressIndicator() // Exibe um indicador de progresso.
+              else // Caso contrário.
+                ElevatedButton( // Botão de login.
+                  onPressed: () { // Função chamada ao pressionar o botão.
+                    final String email = _emailController.text.trim(); // Obtém o email e remove espaços.
+                    final String password = _passwordController.text.trim(); // Obtém a senha e remove espaços.
 
-                    bool hasLocalError = false;
-                    String? tempEmailError;
-                    String? tempPasswordError;
+                    bool hasLocalError = false; // Flag para indicar se há erro local.
+                    String? tempEmailError; // Variável temporária para erro de email.
+                    String? tempPasswordError; // Variável temporária para erro de senha.
 
-                    if (email.isEmpty) {
-                      tempEmailError = 'Por favor, preencha seu email.';
-                      hasLocalError = true;
+                    if (email.isEmpty) { // Se o email estiver vazio.
+                      tempEmailError = 'Por favor, preencha seu email.'; // Define a mensagem de erro.
+                      hasLocalError = true; // Define a flag de erro local.
                     }
-                    if (password.isEmpty) {
-                      tempPasswordError = 'Por favor, preencha sua senha.';
-                      hasLocalError = true;
+                    if (password.isEmpty) { // Se a senha estiver vazia.
+                      tempPasswordError = 'Por favor, preencha sua senha.'; // Define a mensagem de erro.
+                      hasLocalError = true; // Define a flag de erro local.
                     }
 
-                    setState(() {
-                      _emailLocalError = tempEmailError;
-                      _passwordLocalError = tempPasswordError;
+                    setState(() { // Atualiza o estado da UI.
+                      _emailLocalError = tempEmailError; // Define o erro local do email.
+                      _passwordLocalError = tempPasswordError; // Define o erro local da senha.
                     });
 
-                    if (hasLocalError) {
-                      return;
+                    if (hasLocalError) { // Se houver erro local.
+                      return; // Sai da função.
                     }
 
                     // Clear any auth-related error from previous attempts before login
-                    ref.read(authProvider.notifier).state = authState.copyWith(error: null, isEmailError: null);
-                    ref.read(authProvider.notifier).login(email, password);
+                    ref.read(authProvider.notifier).state = authState.copyWith(error: null, isEmailError: null); // Limpa erros anteriores antes de tentar o login.
+                    ref.read(authProvider.notifier).login(email, password); // Chama o método de login no controlador.
                   },
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(50), // Make button full width
+                  style: ElevatedButton.styleFrom( // Estilo do botão.
+                    minimumSize: const Size.fromHeight(50), // Make button full width // Largura total.
                   ),
-                  child: const Text('Login'),
+                  child: const Text('Login'), // Texto do botão.
                 ),
-              const SizedBox(height: 20.0), // Space before registration button
-              TextButton(
-                onPressed: () {
+              const SizedBox(height: 20.0), // Space before registration button // Espaço antes do botão de cadastro.
+              TextButton( // Botão de texto para cadastro.
+                onPressed: () { // Função chamada ao pressionar o botão.
                   // Clear any previous auth errors before navigating to register
-                  ref.read(authProvider.notifier).state =
-                      ref.read(authProvider.notifier).state.copyWith(error: null, isEmailError: null);
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (BuildContext context) => const RegisterScreen(),
+                  ref.read(authProvider.notifier).state = // Atualiza o estado para limpar erros.
+                      ref.read(authProvider.notifier).state.copyWith(error: null, isEmailError: null); // Limpa erros de autenticação.
+                  Navigator.of(context).push( // Navega para a tela de registro.
+                    MaterialPageRoute<void>( // Define a rota.
+                      builder: (BuildContext context) => const RegisterScreen(), // Constrói a tela de registro.
                     ),
                   );
                 },
-                child: const Text(
-                  'Não tem uma conta? Cadastre-se aqui!',
-                  style: TextStyle(color: Colors.pinkAccent, fontSize: 16),
+                child: const Text( // Texto do botão.
+                  'Não tem uma conta? Cadastre-se aqui!', // Texto para cadastro.
+                  style: TextStyle(color: Colors.pinkAccent, fontSize: 16), // Estilo do texto.
                 ),
               ),
             ],
@@ -457,148 +469,174 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
-class RegisterScreen extends ConsumerStatefulWidget {
-  const RegisterScreen({super.key});
+class RegisterScreen extends ConsumerStatefulWidget { // Define a tela de registro como um StatefulWidget que consome provedores Riverpod.
+  const RegisterScreen({super.key}); // Construtor constante.
 
-  @override
-  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
+  @override // Sobrescreve o método createState.
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState(); // Cria e retorna o estado para esta tela.
 }
 
-class _RegisterScreenState extends ConsumerState<RegisterScreen> {
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  String? _emailLocalError; // Local state for empty email field validation error
-  String? _passwordLocalError; // Local state for empty password field validation error
+class _RegisterScreenState extends ConsumerState<RegisterScreen> { // Define o estado privado da tela de registro.
+  final TextEditingController _nameController = TextEditingController(); // New: Name controller // Controlador para o campo de texto do nome.
+  final TextEditingController _emailController = TextEditingController(); // Controlador para o campo de texto do email.
+  final TextEditingController _passwordController = TextEditingController(); // Controlador para o campo de texto da senha.
+  String? _nameLocalError; // New: Local state for empty name field validation error // Erro de validação local para o nome.
+  String? _emailLocalError; // Local state for empty email field validation error // Erro de validação local para o email.
+  String? _passwordLocalError; // Local state for empty password field validation error // Erro de validação local para a senha.
 
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
+  @override // Sobrescreve o método dispose.
+  void dispose() { // Libera os recursos dos controladores.
+    _nameController.dispose(); // Dispose new controller // Descarta o controlador de nome.
+    _emailController.dispose(); // Descarta o controlador de email.
+    _passwordController.dispose(); // Descarta o controlador de senha.
+    super.dispose(); // Chama o dispose da superclasse.
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final AuthState authState = ref.watch(authProvider);
+  @override // Sobrescreve o método build.
+  Widget build(BuildContext context) { // Constrói a interface do usuário para esta tela.
+    final AuthState authState = ref.watch(authProvider); // Observa as mudanças no estado de autenticação.
 
-    String? emailAuthError;
-    String? passwordAuthError;
+    String? emailAuthError; // Variável para armazenar erro de autenticação do email.
+    // Removed passwordAuthError as current `AuthController.register` only produces email errors. // Removido passwordAuthError, pois o registro atual só produz erros de email.
 
-    if (authState.error != null && !authState.isLoading) {
-      if (authState.isEmailError == true) {
+    if (authState.error != null && !authState.isLoading) { // Se houver um erro de autenticação e não estiver carregando.
+      if (authState.isEmailError == true) { // Se o erro for específico do email.
         // 'Este email já está cadastrado.'
-        emailAuthError = authState.error;
-      } else if (authState.isEmailError == false) {
-        // Hypothetical future password registration error
-        passwordAuthError = authState.error;
+        emailAuthError = authState.error; // Atribui o erro ao email.
       }
     }
 
     // Listen for auth state changes specifically for registration success/error
-    ref.listen<AuthState>(authProvider, (AuthState? previous, AuthState current) {
+    ref.listen<AuthState>(authProvider, (AuthState? previous, AuthState current) { // Escuta mudanças no estado de autenticação para sucesso/erro de registro.
       // If registration was attempted (previous was loading) and it's no longer loading,
       // and there's no error, then registration was successful.
-      if (previous?.isLoading == true && !current.isLoading && current.error == null) {
+      if (previous?.isLoading == true && !current.isLoading && current.error == null) { // Se o registro foi tentado e concluído sem erro.
         // Replace RegisterScreen with RegistrationSuccessScreen
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute<void>(
-            builder: (BuildContext context) => RegistrationSuccessScreen(registeredEmail: _emailController.text),
+        Navigator.of(context).pushReplacement( // Substitui a tela de registro pela tela de sucesso.
+          MaterialPageRoute<void>( // Define a rota.
+            builder: (BuildContext context) => RegistrationSuccessScreen( // Constrói a tela de sucesso.
+              registeredEmail: _emailController.text, // Passa o email registrado.
+              registeredName: _nameController.text, // Pass the registered name // Passa o nome registrado.
+            ),
           ),
         );
       }
     });
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Cadastro de Usuário'),
+    return Scaffold( // Retorna um Scaffold.
+      appBar: AppBar( // Barra superior da tela.
+        title: const Text('Cadastro de Usuário'), // Título da barra.
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              const Icon(Icons.person_add, size: 90, color: Colors.pinkAccent),
-              const SizedBox(height: 32.0),
-              Text(
-                'Criar Nova Conta',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: Colors.pinkAccent,
-                      fontWeight: FontWeight.bold,
+      body: Center( // Centraliza o conteúdo.
+        child: SingleChildScrollView( // Permite rolar o conteúdo.
+          padding: const EdgeInsets.all(24.0), // Adiciona preenchimento.
+          child: Column( // Organiza os widgets em uma coluna.
+            mainAxisAlignment: MainAxisAlignment.center, // Centraliza os filhos verticalmente.
+            children: <Widget>[ // Lista de filhos da coluna.
+              const Icon(Icons.person_add, size: 90, color: Colors.pinkAccent), // Ícone de adicionar pessoa.
+              const SizedBox(height: 32.0), // Espaço vertical.
+              Text( // Texto para criar nova conta.
+                'Criar Nova Conta', // Texto.
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith( // Estilo do texto.
+                      color: Colors.pinkAccent, // Cor pinkAccent.
+                      fontWeight: FontWeight.bold, // Negrito.
                     ),
-                textAlign: TextAlign.center,
+                textAlign: TextAlign.center, // Alinhamento centralizado.
               ),
-              const SizedBox(height: 32.0),
-              TextField(
-                controller: _emailController,
-                onChanged: (_) {
-                  if (_emailLocalError != null) {
-                    setState(() => _emailLocalError = null);
+              const SizedBox(height: 32.0), // Espaço vertical.
+              TextField( // Campo de texto para o nome.
+                controller: _nameController, // New: Name field // Associa o controlador de nome.
+                onChanged: (_) { // Chamado quando o texto muda.
+                  if (_nameLocalError != null) { // Se houver um erro local no nome.
+                    setState(() => _nameLocalError = null); // Limpa o erro local do nome.
                   }
                 },
-                decoration: InputDecoration(
-                  labelText: 'Email',
-                  prefixIcon: const Icon(Icons.email),
-                  hintText: 'seu.email@exemplo.com',
-                  errorText: _emailLocalError ?? emailAuthError,
+                decoration: InputDecoration( // Decoração do campo de texto.
+                  labelText: 'Nome Completo', // Rótulo.
+                  prefixIcon: const Icon(Icons.person), // Ícone prefixo.
+                  hintText: 'Seu nome', // Texto de dica.
+                  errorText: _nameLocalError, // Texto de erro local do nome.
                 ),
-                keyboardType: TextInputType.emailAddress,
+                keyboardType: TextInputType.name, // Tipo de teclado para nome.
               ),
-              const SizedBox(height: 16.0),
-              TextField(
-                controller: _passwordController,
-                onChanged: (_) {
-                  if (_passwordLocalError != null) {
-                    setState(() => _passwordLocalError = null);
+              const SizedBox(height: 16.0), // Espaço vertical.
+              TextField( // Campo de texto para o email.
+                controller: _emailController, // Associa o controlador de email.
+                onChanged: (_) { // Chamado quando o texto muda.
+                  if (_emailLocalError != null) { // Se houver um erro local no email.
+                    setState(() => _emailLocalError = null); // Limpa o erro local do email.
                   }
                 },
-                decoration: InputDecoration(
-                  labelText: 'Senha',
-                  prefixIcon: const Icon(Icons.lock),
-                  hintText: '********',
-                  errorText: _passwordLocalError ?? passwordAuthError,
+                decoration: InputDecoration( // Decoração do campo de texto.
+                  labelText: 'Email', // Rótulo.
+                  prefixIcon: const Icon(Icons.email), // Ícone prefixo.
+                  hintText: 'seu.email@exemplo.com', // Texto de dica.
+                  errorText: _emailLocalError ?? emailAuthError, // Texto de erro (local ou de autenticação).
                 ),
-                obscureText: true,
+                keyboardType: TextInputType.emailAddress, // Tipo de teclado para email.
               ),
-              const SizedBox(height: 32.0),
-              if (authState.isLoading)
-                const CircularProgressIndicator()
-              else
-                ElevatedButton(
-                  onPressed: () {
-                    final String email = _emailController.text.trim();
-                    final String password = _passwordController.text.trim();
+              const SizedBox(height: 16.0), // Espaço vertical.
+              TextField( // Campo de texto para a senha.
+                controller: _passwordController, // Associa o controlador de senha.
+                onChanged: (_) { // Chamado quando o texto muda.
+                  if (_passwordLocalError != null) { // Se houver um erro local na senha.
+                    setState(() => _passwordLocalError = null); // Limpa o erro local da senha.
+                  }
+                },
+                decoration: InputDecoration( // Decoração do campo de texto.
+                  labelText: 'Senha', // Rótulo.
+                  prefixIcon: const Icon(Icons.lock), // Ícone prefixo.
+                  hintText: '********', // Texto de dica.
+                  errorText: _passwordLocalError, // Only local error for password currently // Texto de erro local da senha (apenas local atualmente).
+                ),
+                obscureText: true, // Oculta o texto para senha.
+              ),
+              const SizedBox(height: 32.0), // Espaço vertical.
+              if (authState.isLoading) // Se estiver carregando.
+                const CircularProgressIndicator() // Exibe um indicador de progresso.
+              else // Caso contrário.
+                ElevatedButton( // Botão de cadastro.
+                  onPressed: () { // Função chamada ao pressionar o botão.
+                    final String name = _nameController.text.trim(); // Get name // Obtém o nome e remove espaços.
+                    final String email = _emailController.text.trim(); // Obtém o email e remove espaços.
+                    final String password = _passwordController.text.trim(); // Obtém a senha e remove espaços.
 
-                    bool hasLocalError = false;
-                    String? tempEmailError;
-                    String? tempPasswordError;
+                    bool hasLocalError = false; // Flag para indicar se há erro local.
+                    String? tempNameError; // New error variable // Variável temporária para erro de nome.
+                    String? tempEmailError; // Variável temporária para erro de email.
+                    String? tempPasswordError; // Variável temporária para erro de senha.
 
-                    if (email.isEmpty) {
-                      tempEmailError = 'Por favor, preencha seu email para cadastro.';
-                      hasLocalError = true;
+                    if (name.isEmpty) { // Validate name // Se o nome estiver vazio.
+                      tempNameError = 'Por favor, preencha seu nome.'; // Define a mensagem de erro para o nome.
+                      hasLocalError = true; // Define a flag de erro local.
                     }
-                    if (password.isEmpty) {
-                      tempPasswordError = 'Por favor, preencha sua senha para cadastro.';
-                      hasLocalError = true;
+                    if (email.isEmpty) { // Se o email estiver vazio.
+                      tempEmailError = 'Por favor, preencha seu email para cadastro.'; // Define a mensagem de erro para o email.
+                      hasLocalError = true; // Define a flag de erro local.
+                    }
+                    if (password.isEmpty) { // Se a senha estiver vazia.
+                      tempPasswordError = 'Por favor, preencha sua senha para cadastro.'; // Define a mensagem de erro para a senha.
+                      hasLocalError = true; // Define a flag de erro local.
                     }
 
-                    setState(() {
-                      _emailLocalError = tempEmailError;
-                      _passwordLocalError = tempPasswordError;
+                    setState(() { // Atualiza o estado da UI.
+                      _nameLocalError = tempNameError; // Set name error // Define o erro local do nome.
+                      _emailLocalError = tempEmailError; // Define o erro local do email.
+                      _passwordLocalError = tempPasswordError; // Define o erro local da senha.
                     });
 
-                    if (hasLocalError) {
-                      return;
+                    if (hasLocalError) { // Se houver erro local.
+                      return; // Sai da função.
                     }
 
                     // Clear any auth-related error from previous attempts before register
-                    ref.read(authProvider.notifier).state = authState.copyWith(error: null, isEmailError: null);
-                    ref.read(authProvider.notifier).register(email, password);
+                    ref.read(authProvider.notifier).state = authState.copyWith(error: null, isEmailError: null); // Limpa erros anteriores antes de tentar o registro.
+                    ref.read(authProvider.notifier).register(email, password, name); // Pass name to register // Chama o método de registro no controlador, passando nome, email e senha.
                   },
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(50),
+                  style: ElevatedButton.styleFrom( // Estilo do botão.
+                    minimumSize: const Size.fromHeight(50), // Largura total.
                   ),
-                  child: const Text('Cadastrar'),
+                  child: const Text('Cadastrar'), // Texto do botão.
                 ),
             ],
           ),
@@ -608,70 +646,70 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 }
 
-class ProductCard extends StatelessWidget {
-  final Product product;
+class ProductCard extends StatelessWidget { // Define um widget para exibir um cartão de produto.
+  final Product product; // O produto a ser exibido no cartão.
 
-  const ProductCard({super.key, required this.product});
+  const ProductCard({super.key, required this.product}); // Construtor, requer um produto.
 
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8.0),
-              child: Image.network(
-                product.imageUrl ?? 'https://www.gstatic.com/flutter-onestack-prototype/genui/example_1.jpg',
-                width: 80,
-                height: 80,
-                fit: BoxFit.cover,
-                errorBuilder: (BuildContext context, Object error, StackTrace? stackTrace) => Container(
-                  width: 80,
-                  height: 80,
-                  color: Colors.grey[200],
-                  child: const Icon(Icons.image_not_supported, color: Colors.grey),
+  @override // Sobrescreve o método build.
+  Widget build(BuildContext context) { // Constrói a interface do usuário para o cartão de produto.
+    return Card( // Retorna um cartão.
+      margin: const EdgeInsets.symmetric(vertical: 8.0), // Margem vertical.
+      elevation: 2, // Elevação do cartão.
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), // Forma do cartão com bordas arredondadas.
+      child: Padding( // Adiciona preenchimento interno.
+        padding: const EdgeInsets.all(16.0), // Preenchimento de 16.0 em todas as direções.
+        child: Row( // Organiza os widgets em uma linha.
+          crossAxisAlignment: CrossAxisAlignment.start, // Alinha os filhos ao início na transversal.
+          children: <Widget>[ // Lista de filhos da linha.
+            ClipRRect( // Recorta um retângulo com bordas arredondadas.
+              borderRadius: BorderRadius.circular(8.0), // Raio da borda de 8.0.
+              child: Image.network( // Exibe uma imagem da rede.
+                product.imageUrl ?? 'https://www.gstatic.com/flutter-onestack-prototype/genui/example_1.jpg', // URL da imagem do produto, ou uma imagem de placeholder se for nula.
+                width: 80, // Largura da imagem.
+                height: 80, // Altura da imagem.
+                fit: BoxFit.cover, // Ajusta a imagem para cobrir a área.
+                errorBuilder: (BuildContext context, Object error, StackTrace? stackTrace) => Container( // Construtor de erro para a imagem.
+                  width: 80, // Largura do contêiner de erro.
+                  height: 80, // Altura do contêiner de erro.
+                  color: Colors.grey[200], // Cor de fundo do contêiner de erro.
+                  child: const Icon(Icons.image_not_supported, color: Colors.grey), // Ícone de imagem não suportada.
                 ),
               ),
             ),
-            const SizedBox(width: 16.0),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    product.name,
-                    style:
-                        Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+            const SizedBox(width: 16.0), // Espaço horizontal.
+            Expanded( // Expande o widget filho para preencher o espaço disponível.
+              child: Column( // Organiza os widgets em uma coluna.
+                crossAxisAlignment: CrossAxisAlignment.start, // Alinha os filhos ao início na transversal.
+                children: <Widget>[ // Lista de filhos da coluna.
+                  Text( // Texto para o nome do produto.
+                    product.name, // Nome do produto.
+                    style: // Estilo do texto.
+                        Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), // Estilo do título médio com negrito.
+                    maxLines: 2, // Máximo de 2 linhas.
+                    overflow: TextOverflow.ellipsis, // Adiciona reticências se o texto exceder.
                   ),
-                  const SizedBox(height: 4.0),
-                  Text(
-                    product.description,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
+                  const SizedBox(height: 4.0), // Espaço vertical.
+                  Text( // Texto para a descrição do produto.
+                    product.description, // Descrição do produto.
+                    style: Theme.of(context).textTheme.bodyMedium, // Estilo do corpo médio.
+                    maxLines: 3, // Máximo de 3 linhas.
+                    overflow: TextOverflow.ellipsis, // Adiciona reticências se o texto exceder.
                   ),
-                  const SizedBox(height: 8.0),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: <Widget>[
-                      Text(
-                        'R\$ ${product.price.toStringAsFixed(2)}',
-                        style: Theme.of(context)
-                            .textTheme.titleSmall?.copyWith(color: Colors.green[700], fontWeight: FontWeight.bold),
+                  const SizedBox(height: 8.0), // Espaço vertical.
+                  Row( // Organiza os widgets em uma linha.
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween, // Distribui o espaço igualmente entre os filhos.
+                    children: <Widget>[ // Lista de filhos da linha.
+                      Text( // Texto para o preço do produto.
+                        'R\$ ${product.price.toStringAsFixed(2)}', // Preço formatado.
+                        style: Theme.of(context) // Estilo do texto.
+                            .textTheme.titleSmall?.copyWith(color: Colors.green[700], fontWeight: FontWeight.bold), // Estilo do título pequeno com cor verde e negrito.
                       ),
-                      if (product.rxOnly)
-                        Chip(
-                          label: const Text('Com receita', style: TextStyle(fontSize: 12, color: Colors.white)),
-                          backgroundColor: Colors.red[400],
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      if (product.rxOnly) // Se o produto precisa de receita.
+                        Chip( // Exibe um chip.
+                          label: const Text('Com receita', style: TextStyle(fontSize: 12, color: Colors.white)), // Rótulo do chip.
+                          backgroundColor: Colors.red[400], // Cor de fundo do chip.
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, // Ajusta o tamanho da área de toque.
                         ),
                     ],
                   ),
@@ -685,52 +723,52 @@ class ProductCard extends StatelessWidget {
   }
 }
 
-class AppLibraryScreen extends ConsumerStatefulWidget {
-  const AppLibraryScreen({super.key});
+class AppLibraryScreen extends ConsumerStatefulWidget { // Define a tela da biblioteca do aplicativo como um StatefulWidget que consome provedores Riverpod.
+  const AppLibraryScreen({super.key}); // Construtor constante.
 
-  @override
-  ConsumerState<AppLibraryScreen> createState() => _AppLibraryScreenState();
+  @override // Sobrescreve o método createState.
+  ConsumerState<AppLibraryScreen> createState() => _AppLibraryScreenState(); // Cria e retorna o estado para esta tela.
 }
 
-class _AppLibraryScreenState extends ConsumerState<AppLibraryScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  static const List<String> _productCategories = ['Remédios', 'Rações', 'Brinquedos'];
+class _AppLibraryScreenState extends ConsumerState<AppLibraryScreen> with SingleTickerProviderStateMixin { // Define o estado privado da tela da biblioteca, mixin para TabController.
+  late TabController _tabController; // Controlador para as abas.
+  static const List<String> _productCategories = ['Remédios', 'Rações', 'Brinquedos']; // Lista de categorias de produtos.
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: _productCategories.length, vsync: this);
+  @override // Sobrescreve o método initState.
+  void initState() { // Inicializa o estado.
+    super.initState(); // Chama o initState da superclasse.
+    _tabController = TabController(length: _productCategories.length, vsync: this); // Inicializa o TabController com o número de categorias.
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+  @override // Sobrescreve o método dispose.
+  void dispose() { // Libera os recursos do controlador.
+    _tabController.dispose(); // Descarta o TabController.
+    super.dispose(); // Chama o dispose da superclasse.
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final AuthState authState = ref.watch(authProvider);
-    final UserProfile? currentUser = authState.currentUser;
-    final List<Product> allProducts = ref.watch(productProvider);
+  @override // Sobrescreve o método build.
+  Widget build(BuildContext context) { // Constrói a interface do usuário para esta tela.
+    final AuthState authState = ref.watch(authProvider); // Observa as mudanças no estado de autenticação.
+    final UserProfile? currentUser = authState.currentUser; // Obtém o perfil do usuário logado.
+    final List<Product> allProducts = ref.watch(productProvider); // Observa a lista de todos os produtos.
 
-    if (currentUser == null) {
+    if (currentUser == null) { // Se não houver usuário logado (situação inesperada se a navegação for guardada).
       // This case should ideally not be reached if navigation is guarded by AuthChecker.
-      return Scaffold(
-        appBar: AppBar(title: const Text('Erro')),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              const Icon(Icons.error_outline, size: 60, color: Colors.red),
-              const SizedBox(height: 16),
-              Text('Nenhum usuário logado.', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop(); // Go back to the previous screen (Login or Home)
+      return Scaffold( // Retorna um Scaffold de erro.
+        appBar: AppBar(title: const Text('Erro')), // Barra superior com título 'Erro'.
+        body: Center( // Centraliza o conteúdo.
+          child: Column( // Organiza em coluna.
+            mainAxisAlignment: MainAxisAlignment.center, // Centraliza verticalmente.
+            children: <Widget>[ // Filhos da coluna.
+              const Icon(Icons.error_outline, size: 60, color: Colors.red), // Ícone de erro.
+              const SizedBox(height: 16), // Espaço vertical.
+              Text('Nenhum usuário logado.', style: Theme.of(context).textTheme.titleMedium), // Mensagem de erro.
+              const SizedBox(height: 16), // Espaço vertical.
+              ElevatedButton( // Botão para voltar.
+                onPressed: () { // Ao pressionar.
+                  Navigator.of(context).pop(); // Go back to the previous screen (Login or Home) // Volta para a tela anterior.
                 },
-                child: const Text('Voltar'),
+                child: const Text('Voltar'), // Texto do botão.
               ),
             ],
           ),
@@ -738,55 +776,55 @@ class _AppLibraryScreenState extends ConsumerState<AppLibraryScreen> with Single
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Biblioteca do Aplicativo'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: _productCategories.map<Widget>((String category) => Tab(text: category)).toList(),
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.white,
+    return Scaffold( // Retorna um Scaffold normal se o usuário estiver logado.
+      appBar: AppBar( // Barra superior da tela.
+        title: const Text('Biblioteca do Aplicativo'), // Título da barra.
+        bottom: TabBar( // Barra de abas na parte inferior da AppBar.
+          controller: _tabController, // Associa o controlador de abas.
+          tabs: _productCategories.map<Widget>((String category) => Tab(text: category)).toList(), // Mapeia categorias para abas.
+          labelColor: Colors.white, // Cor do texto da aba selecionada.
+          unselectedLabelColor: Colors.white70, // Cor do texto da aba não selecionada.
+          indicatorColor: Colors.white, // Cor do indicador da aba.
         ),
       ),
-      body: Column(
-        children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      'Informações do Usuário:',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+      body: Column( // Organiza o corpo da tela em uma coluna.
+        children: <Widget>[ // Filhos da coluna.
+          Padding( // Adiciona preenchimento.
+            padding: const EdgeInsets.all(16.0), // Preenchimento de 16.0.
+            child: Card( // Exibe um cartão com informações do usuário.
+              elevation: 4, // Elevação do cartão.
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), // Forma com bordas arredondadas.
+              child: Padding( // Adiciona preenchimento interno.
+                padding: const EdgeInsets.all(16.0), // Preenchimento de 16.0.
+                child: Column( // Organiza o conteúdo do cartão em uma coluna.
+                  crossAxisAlignment: CrossAxisAlignment.start, // Alinha ao início na transversal.
+                  children: <Widget>[ // Filhos da coluna.
+                    Text( // Título das informações do usuário.
+                      'Informações do Usuário:', // Texto.
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold), // Estilo de título grande com negrito.
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: <Widget>[
-                        const Icon(Icons.person, color: Colors.pinkAccent),
-                        const SizedBox(width: 8),
-                        Text('Nome: ${currentUser.name}', style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8), // Espaço vertical.
+                    Row( // Linha para exibir o nome.
+                      children: <Widget>[ // Filhos da linha.
+                        const Icon(Icons.person, color: Colors.pinkAccent), // Ícone de pessoa.
+                        const SizedBox(width: 8), // Espaço horizontal.
+                        Text('Nome: ${currentUser.name}', style: Theme.of(context).textTheme.titleMedium), // Nome do usuário.
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: <Widget>[
-                        const Icon(Icons.badge, color: Colors.pinkAccent),
-                        const SizedBox(width: 8),
-                        Text('ID: ${currentUser.id}', style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 4), // Espaço vertical.
+                    Row( // Linha para exibir o ID.
+                      children: <Widget>[ // Filhos da linha.
+                        const Icon(Icons.badge, color: Colors.pinkAccent), // Ícone de crachá.
+                        const SizedBox(width: 8), // Espaço horizontal.
+                        Text('ID: ${currentUser.id}', style: Theme.of(context).textTheme.titleMedium), // ID do usuário.
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: <Widget>[
-                        const Icon(Icons.email, color: Colors.pinkAccent),
-                        const SizedBox(width: 8),
-                        Text('Email: ${currentUser.email}', style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 4), // Espaço vertical.
+                    Row( // Linha para exibir o email.
+                      children: <Widget>[ // Filhos da linha.
+                        const Icon(Icons.email, color: Colors.pinkAccent), // Ícone de email.
+                        const SizedBox(width: 8), // Espaço horizontal.
+                        Text('Email: ${currentUser.email}', style: Theme.of(context).textTheme.titleMedium), // Email do usuário.
                       ],
                     ),
                   ],
@@ -794,25 +832,25 @@ class _AppLibraryScreenState extends ConsumerState<AppLibraryScreen> with Single
               ),
             ),
           ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: _productCategories.map<Widget>((String category) {
-                final List<Product> categoryProducts = allProducts.where((Product p) => p.category == category).toList();
-                if (categoryProducts.isEmpty) {
-                  return Center(
-                    child: Text('Nenhum item encontrado na categoria "$category".', style: Theme.of(context).textTheme.titleMedium),
+          Expanded( // Expande para preencher o espaço restante.
+            child: TabBarView( // Visualização das abas.
+              controller: _tabController, // Associa o controlador de abas.
+              children: _productCategories.map<Widget>((String category) { // Mapeia categorias para a visualização das abas.
+                final List<Product> categoryProducts = allProducts.where((Product p) => p.category == category).toList(); // Filtra produtos por categoria.
+                if (categoryProducts.isEmpty) { // Se não houver produtos na categoria.
+                  return Center( // Centraliza o texto.
+                    child: Text('Nenhum item encontrado na categoria "$category".', style: Theme.of(context).textTheme.titleMedium), // Mensagem de nenhum item.
                   );
                 }
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  itemCount: categoryProducts.length,
-                  itemBuilder: (BuildContext context, int index) {
-                    final Product product = categoryProducts[index];
-                    return ProductCard(product: product);
+                return ListView.builder( // Constrói uma lista rolável de produtos.
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0), // Preenchimento da lista.
+                  itemCount: categoryProducts.length, // Número de itens na lista.
+                  itemBuilder: (BuildContext context, int index) { // Construtor de itens da lista.
+                    final Product product = categoryProducts[index]; // Obtém o produto atual.
+                    return ProductCard(product: product); // Retorna um ProductCard para o produto.
                   },
                 );
-              }).toList(),
+              }).toList(), // Converte o iterável em uma lista de widgets.
             ),
           ),
         ],
@@ -821,62 +859,62 @@ class _AppLibraryScreenState extends ConsumerState<AppLibraryScreen> with Single
   }
 }
 
-class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key});
+class HomeScreen extends ConsumerWidget { // Define a tela principal como um widget sem estado que consome provedores Riverpod.
+  const HomeScreen({super.key}); // Construtor constante.
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final AuthState authState = ref.watch(authProvider);
-    final UserProfile? currentUser = authState.currentUser;
+  @override // Sobrescreve o método build.
+  Widget build(BuildContext context, WidgetRef ref) { // Constrói a interface do usuário para a tela principal.
+    final AuthState authState = ref.watch(authProvider); // Observa as mudanças no estado de autenticação.
+    final UserProfile? currentUser = authState.currentUser; // Obtém o perfil do usuário logado.
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Página Principal'),
-        actions: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              ref.read(authProvider.notifier).logout();
+    return Scaffold( // Retorna um Scaffold.
+      appBar: AppBar( // Barra superior da tela.
+        title: const Text('Página Principal'), // Título da barra.
+        actions: <Widget>[ // Ações na barra superior (botões à direita).
+          IconButton( // Botão de ícone.
+            icon: const Icon(Icons.logout), // Ícone de logout.
+            onPressed: () { // Função chamada ao pressionar o botão.
+              ref.read(authProvider.notifier).logout(); // Chama o método de logout no controlador de autenticação.
             },
-            tooltip: 'Sair',
+            tooltip: 'Sair', // Dica de ferramenta.
           ),
         ],
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Icon(Icons.check_circle_outline, size: 90, color: Colors.green),
-            const SizedBox(height: 32.0),
-            Text(
-              'Você está logado!',
-              style: Theme.of(context).textTheme.headlineSmall,
+      body: Center( // Centraliza o conteúdo no corpo da tela.
+        child: Column( // Organiza os widgets em uma coluna.
+          mainAxisAlignment: MainAxisAlignment.center, // Centraliza os filhos verticalmente.
+          children: <Widget>[ // Lista de filhos da coluna.
+            const Icon(Icons.check_circle_outline, size: 90, color: Colors.green), // Ícone de sucesso.
+            const SizedBox(height: 32.0), // Espaço vertical.
+            Text( // Texto de confirmação de login.
+              'Você está logado!', // Texto.
+              style: Theme.of(context).textTheme.headlineSmall, // Estilo do texto.
             ),
-            const SizedBox(height: 12.0),
-            Text(
-              'Bem-vindo de volta, ${currentUser?.name ?? 'usuário'}!',
-              style: Theme.of(context).textTheme.titleMedium,
+            const SizedBox(height: 12.0), // Espaço vertical.
+            Text( // Texto de boas-vindas com o nome do usuário.
+              'Bem-vindo de volta, ${currentUser?.name ?? 'usuário'}!', // Exibe o nome do usuário ou 'usuário'.
+              style: Theme.of(context).textTheme.titleMedium, // Estilo do texto.
             ),
-            const SizedBox(height: 32.0),
-            ElevatedButton.icon(
-              onPressed: () {
+            const SizedBox(height: 32.0), // Espaço vertical.
+            ElevatedButton.icon( // Botão elevado com ícone.
+              onPressed: () { // Função chamada ao pressionar o botão.
                 // Navigate to AppLibraryScreen
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (BuildContext context) => const AppLibraryScreen(),
+                Navigator.of(context).push( // Navega para a tela AppLibraryScreen.
+                  MaterialPageRoute<void>( // Define a rota.
+                    builder: (BuildContext context) => const AppLibraryScreen(), // Constrói a tela da biblioteca.
                   ),
                 );
               },
-              icon: const Icon(Icons.apps), // Changed icon
-              label: const Text('Ir para o App'), // Changed text
+              icon: const Icon(Icons.apps), // Changed icon // Ícone de aplicativos.
+              label: const Text('Ir para o App'), // Changed text // Texto do botão.
             ),
-            const SizedBox(height: 16.0), // Added space for logout
-            TextButton(
+            const SizedBox(height: 16.0), // Added space for logout // Espaço adicional para o botão de logout.
+            TextButton( // Botão de texto.
               // Keep a logout option
-              onPressed: () {
-                ref.read(authProvider.notifier).logout();
+              onPressed: () { // Função chamada ao pressionar o botão.
+                ref.read(authProvider.notifier).logout(); // Chama o método de logout no controlador de autenticação.
               },
-              child: const Text('Sair da Conta'),
+              child: const Text('Sair da Conta'), // Texto do botão.
             ),
           ],
         ),
@@ -885,96 +923,96 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-class AuthChecker extends ConsumerWidget {
-  const AuthChecker({super.key});
+class AuthChecker extends ConsumerWidget { // Define um widget para verificar o estado de autenticação.
+  const AuthChecker({super.key}); // Construtor constante.
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final AuthState authState = ref.watch(authProvider);
+  @override // Sobrescreve o método build.
+  Widget build(BuildContext context, WidgetRef ref) { // Constrói a interface do usuário com base no estado de autenticação.
+    final AuthState authState = ref.watch(authProvider); // Observa as mudanças no estado de autenticação.
 
-    if (authState.isAuthed) {
-      return const HomeScreen();
-    } else {
-      return const LoginScreen();
+    if (authState.isAuthed) { // Se o usuário estiver autenticado.
+      return const HomeScreen(); // Retorna a tela principal.
+    } else { // Caso contrário.
+      return const LoginScreen(); // Retorna a tela de login.
     }
   }
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class MyApp extends StatelessWidget { // Define o widget principal do aplicativo.
+  const MyApp({super.key}); // Construtor constante.
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'VetApp',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.pink,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.pinkAccent,
-          foregroundColor: Colors.white,
-          centerTitle: true,
-          titleTextStyle: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+  @override // Sobrescreve o método build.
+  Widget build(BuildContext context) { // Constrói o aplicativo.
+    return MaterialApp( // Retorna um MaterialApp, que é o widget raiz de um aplicativo Flutter.
+      title: 'VetApp', // Título do aplicativo (aparece na barra de tarefas, por exemplo).
+      debugShowCheckedModeBanner: false, // Remove a faixa de "Debug" no canto superior direito.
+      theme: ThemeData( // Define o tema visual do aplicativo.
+        primarySwatch: Colors.pink, // Cor primária do tema.
+        visualDensity: VisualDensity.adaptivePlatformDensity, // Densidade visual adaptativa.
+        appBarTheme: const AppBarTheme( // Tema para a AppBar.
+          backgroundColor: Colors.pinkAccent, // Cor de fundo da AppBar.
+          foregroundColor: Colors.white, // Cor do texto e ícones na AppBar.
+          centerTitle: true, // Centraliza o título da AppBar.
+          titleTextStyle: TextStyle( // Estilo do texto do título da AppBar.
+            fontSize: 20, // Tamanho da fonte.
+            fontWeight: FontWeight.bold, // Negrito.
+            color: Colors.white, // Cor branca.
           ),
         ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.pinkAccent,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-            textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
+        elevatedButtonTheme: ElevatedButtonThemeData( // Tema para botões elevados.
+          style: ElevatedButton.styleFrom( // Estilo do botão elevado.
+            backgroundColor: Colors.pinkAccent, // Cor de fundo do botão.
+            foregroundColor: Colors.white, // Cor do texto do botão.
+            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15), // Preenchimento horizontal e vertical.
+            textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold), // Estilo do texto do botão.
+            shape: RoundedRectangleBorder( // Forma do botão.
+              borderRadius: BorderRadius.circular(10), // Bordas arredondadas.
             ),
           ),
         ),
-        inputDecorationTheme: InputDecorationTheme(
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide.none,
+        inputDecorationTheme: InputDecorationTheme( // Tema para decoração de campos de entrada.
+          border: OutlineInputBorder( // Borda padrão.
+            borderRadius: BorderRadius.circular(10), // Bordas arredondadas.
+            borderSide: BorderSide.none, // Sem borda.
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: Colors.pinkAccent, width: 2),
+          focusedBorder: OutlineInputBorder( // Borda quando o campo está focado.
+            borderRadius: BorderRadius.circular(10), // Bordas arredondadas.
+            borderSide: const BorderSide(color: Colors.pinkAccent, width: 2), // Borda rosa com 2 de largura.
           ),
-          errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: Colors.pink, width: 2),
+          errorBorder: OutlineInputBorder( // Borda quando há um erro.
+            borderRadius: BorderRadius.circular(10), // Bordas arredondadas.
+            borderSide: const BorderSide(color: Colors.pink, width: 2), // Borda rosa com 2 de largura.
           ),
-          focusedErrorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: Colors.pink, width: 2),
+          focusedErrorBorder: OutlineInputBorder( // Borda quando há um erro e o campo está focado.
+            borderRadius: BorderRadius.circular(10), // Bordas arredondadas.
+            borderSide: const BorderSide(color: Colors.pink, width: 2), // Borda rosa com 2 de largura.
           ),
-          filled: true,
-          fillColor: Colors.pink.withOpacity(0.08),
-          contentPadding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 16.0),
-          labelStyle: TextStyle(color: Colors.grey[700]),
-          hintStyle: TextStyle(color: Colors.grey[400]),
-          prefixIconColor: Colors.pinkAccent,
-          errorStyle: const TextStyle(color: Colors.pink, fontSize: 14),
+          filled: true, // Campo preenchido.
+          fillColor: Colors.pink.withOpacity(0.08), // Cor de preenchimento rosa com opacidade.
+          contentPadding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 16.0), // Preenchimento interno do conteúdo.
+          labelStyle: TextStyle(color: Colors.grey[700]), // Estilo do rótulo.
+          hintStyle: TextStyle(color: Colors.grey[400]), // Estilo do texto de dica.
+          prefixIconColor: Colors.pinkAccent, // Cor dos ícones de prefixo.
+          errorStyle: const TextStyle(color: Colors.pink, fontSize: 14), // Estilo do texto de erro.
         ),
-        textTheme: const TextTheme(
-          headlineMedium: TextStyle(color: Colors.black87),
-          headlineSmall: TextStyle(color: Colors.black87),
-          titleMedium: TextStyle(color: Colors.black54),
-          titleSmall: TextStyle(color: Colors.black87),
-          titleLarge: TextStyle(color: Colors.black87),
-          bodyMedium: TextStyle(color: Colors.black54),
+        textTheme: const TextTheme( // Tema para estilos de texto.
+          headlineMedium: TextStyle(color: Colors.black87), // Estilo para headlineMedium.
+          headlineSmall: TextStyle(color: Colors.black87), // Estilo para headlineSmall.
+          titleMedium: TextStyle(color: Colors.black54), // Estilo para titleMedium.
+          titleSmall: TextStyle(color: Colors.black87), // Estilo para titleSmall.
+          titleLarge: TextStyle(color: Colors.black87), // Estilo para titleLarge.
+          bodyMedium: TextStyle(color: Colors.black54), // Estilo para bodyMedium.
         ),
       ),
-      home: const AuthChecker(),
+      home: const AuthChecker(), // Define AuthChecker como a tela inicial para verificar a autenticação.
     );
   }
 }
 
-void main() {
-  runApp(
-    const ProviderScope(
-      child: MyApp(),
+void main() { // Função principal do aplicativo.
+  runApp( // Inicia a execução do aplicativo Flutter.
+    const ProviderScope( // Widget que fornece escopo para os provedores Riverpod.
+      child: MyApp(), // O widget raiz do aplicativo.
     ),
   );
 }
