@@ -1,0 +1,2871 @@
+import 'dart:async'; 
+import 'package:flutter/material.dart'; 
+import 'package:flutter_riverpod/flutter_riverpod.dart'; 
+import 'package:collection/collection.dart'; 
+import 'package:intl/intl.dart'; 
+
+// ------------------------------
+// Modelos de Dados
+// ------------------------------
+
+/// Representa o perfil de um usuário no sistema.
+class UserProfile {
+  final int id; // ID único do usuário.
+  final String name; // Nome completo do usuário.
+  final String email; // Endereço de e-mail do usuário, também usado como identificador de login.
+
+  /// Construtor para criar uma nova instância de UserProfile.
+  UserProfile({required this.id, required this.name, required this.email}); // Construtor com parâmetros obrigatórios nomeados.
+}
+
+/// Representa um produto disponível na loja.
+class Product {
+  final int id; // ID único do produto.
+  String name; // Nome do produto.
+  String description; // Descrição detalhada do produto.
+  double price; // Preço do produto.
+  bool rxOnly; // Indica se o produto requer receita médica.
+  String? imageUrl; // URL da imagem do produto (pode ser nula).
+  final String category; // Categoria à qual o produto pertence.
+
+  /// Construtor para criar uma nova instância de Produto.
+  Product({
+    required this.id, // ID é obrigatório.
+    required this.name, // Nome é obrigatório.
+    required this.description, // Descrição é obrigatória.
+    required this.price, // Preço é obrigatório.
+    this.rxOnly = false, // rxOnly é opcional, padrão é false.
+    this.imageUrl, // imageUrl é opcional.
+    required this.category, // Categoria é obrigatória.
+  });
+
+  /// Cria uma nova instância de Produto com valores copiados e/ou modificados.
+  Product copyWith({
+    int? id, // Novo ID (opcional).
+    String? name, // Novo nome (opcional).
+    String? description, // Nova descrição (opcional).
+    double? price, // Novo preço (opcional).
+    bool? rxOnly, // Novo status rxOnly (opcional).
+    String? imageUrl, // Nova URL da imagem (opcional).
+    String? category, // Nova categoria (opcional).
+  }) => // Sintaxe de expressão para um construtor de cópia conciso.
+      Product(
+        id: id ?? this.id, // Se id for nulo, usa o id existente.
+        name: name ?? this.name, // Se name for nulo, usa o name existente.
+        description: description ?? this.description, // Se description for nulo, usa a description existente.
+        price: price ?? this.price, // Se price for nulo, usa o price existente.
+        rxOnly: rxOnly ?? this.rxOnly, // Se rxOnly for nulo, usa o rxOnly existente.
+        imageUrl: imageUrl ?? this.imageUrl, // Se imageUrl for nulo, usa o imageUrl existente.
+        category: category ?? this.category, // Se category for nulo, usa a category existente.
+      );
+}
+
+/// Representa um item individual no carrinho de compras, com um produto e sua quantidade.
+class CartItem {
+  final Product product; // O produto no carrinho.
+  final int quantity; // A quantidade desse produto.
+
+  /// Construtor para criar uma nova instância de CartItem.
+  CartItem({required this.product, required this.quantity}); // Construtor com parâmetros obrigatórios.
+
+  /// Cria uma nova instância de CartItem com valores copiados e/ou modificados.
+  CartItem copyWith({Product? product, int? quantity}) { // Método para criar uma cópia com modificações.
+    return CartItem(
+      product: product ?? this.product, // Se product for nulo, usa o product existente.
+      quantity: quantity ?? this.quantity, // Se quantity for nulo, usa a quantity existente.
+    );
+  }
+}
+
+/// Representa o estado atual da autenticação do usuário.
+class AuthState {
+  final bool isLoading; // Indica se uma operação de autenticação está em andamento.
+  final bool isAuthed; // Indica se o usuário está autenticado.
+  final String? error; // Mensagem de erro, se houver, durante a autenticação.
+  final bool? isEmailError; // Indica se o erro está relacionado ao email.
+  final UserProfile? currentUser; // O perfil do usuário logado (nulo se não autenticado).
+
+  /// Construtor constante para criar uma nova instância de AuthState com valores padrão.
+  const AuthState({
+    this.isLoading = false, // Padrão é false (não carregando).
+    this.isAuthed = false, // Padrão é false (não autenticado).
+    this.error, // Sem erro por padrão.
+    this.isEmailError, // Sem erro de email por padrão.
+    this.currentUser, // Sem usuário logado por padrão.
+  });
+
+  /// Cria uma nova instância de AuthState com valores copiados e/ou modificados.
+  AuthState copyWith({
+    bool? isLoading, // Novo status de carregamento (opcional).
+    bool? isAuthed, // Novo status de autenticação (opcional).
+    String? error, // Nova mensagem de erro (opcional).
+    bool? isEmailError, // Novo status de erro de email (opcional).
+    UserProfile? currentUser, // Novo perfil de usuário (opcional).
+  }) => // Sintaxe de expressão para um construtor de cópia conciso.
+      AuthState(
+        isLoading: isLoading ?? this.isLoading, // Se isLoading for nulo, usa o isLoading existente.
+        isAuthed: isAuthed ?? this.isAuthed, // Se isAuthed for nulo, usa o isAuthed existente.
+        error: error, // Atualiza o erro, permitindo que seja nulo para limpar o erro.
+        isEmailError: isEmailError, // Atualiza o isEmailError, permitindo que seja nulo.
+        currentUser: currentUser, // Atualiza o currentUser, permitindo que seja nulo.
+      );
+}
+
+/// Classe interna para armazenar detalhes de usuários registrados (email, senha, perfil).
+class _RegisteredUserDetails {
+  final String password; // Senha do usuário.
+  final UserProfile userProfile; // Perfil do usuário associado.
+
+  /// Construtor para criar uma nova instância de _RegisteredUserDetails.
+  _RegisteredUserDetails({required this.password, required this.userProfile}); // Construtor com parâmetros obrigatórios.
+}
+
+/// Representa um serviço agendável.
+class Service {
+  final int id; // ID único do serviço.
+  String name; // Nome do serviço.
+  String description; // Descrição detalhada do serviço.
+  double price; // Preço do serviço.
+  int durationMinutes; // Duração do serviço em minutos.
+  String? imageUrl; // URL da imagem do serviço (pode ser nula).
+
+  /// Construtor para criar uma nova instância de Service.
+  Service({
+    required this.id, // ID é obrigatório.
+    required this.name, // Nome é obrigatório.
+    required this.description, // Descrição é obrigatória.
+    required this.price, // Preço é obrigatório.
+    required this.durationMinutes, // Duração é obrigatória.
+    this.imageUrl, // imageUrl é opcional.
+  });
+
+  /// Cria uma nova instância de Service com valores copiados e/ou modificados.
+  Service copyWith({
+    int? id, // Novo ID (opcional).
+    String? name, // Novo nome (opcional).
+    String? description, // Nova descrição (opcional).
+    double? price, // Novo preço (opcional).
+    int? durationMinutes, // Nova duração (opcional).
+    String? imageUrl, // Nova URL da imagem (opcional).
+  }) => // Sintaxe de expressão para um construtor de cópia conciso.
+      Service(
+        id: id ?? this.id, // Se id for nulo, usa o id existente.
+        name: name ?? this.name, // Se name for nulo, usa o name existente.
+        description: description ?? this.description, // Se description for nulo, usa a description existente.
+        price: price ?? this.price, // Se price for nulo, usa o price existente.
+        durationMinutes: durationMinutes ?? this.durationMinutes, // Se durationMinutes for nulo, usa o durationMinutes existente.
+        imageUrl: imageUrl ?? this.imageUrl, // Se imageUrl for nulo, usa o imageUrl existente.
+      );
+}
+
+/// Enum para representar o status de uma reserva.
+enum ReservationStatus {
+  pending('Pendente', Icons.access_time, Colors.orange), // Status pendente com nome, ícone e cor.
+  confirmed('Confirmada', Icons.check_circle_outline, Colors.green), // Status confirmada.
+  cancelled('Cancelada', Icons.cancel_outlined, Colors.red), // Status cancelada.
+  completed('Concluída', Icons.task_alt, Colors.blueGrey); // Status concluída.
+
+  final String displayName; // Nome de exibição do status.
+  final IconData icon; // Ícone associado ao status.
+  final Color color; // Cor associada ao status.
+
+  const ReservationStatus(this.displayName, this.icon, this.color); // Construtor para o enum.
+}
+
+/// Representa uma reserva de serviço.
+class Reservation {
+  final int id; // ID único da reserva.
+  final int userId; // ID do usuário que fez a reserva.
+  final String userName; // Nome do usuário que fez a reserva.
+  final int serviceId; // ID do serviço reservado.
+  final String serviceName; // Nome do serviço reservado.
+  final DateTime reservationDateTime; // Data e hora da reserva.
+  final ReservationStatus status; // Status atual da reserva.
+  final String? notes; // Notas adicionais sobre a reserva (opcional).
+
+  /// Construtor para criar uma nova instância de Reservation.
+  Reservation({
+    required this.id, // ID é obrigatório.
+    required this.userId, // userId é obrigatório.
+    required this.userName, // userName é obrigatório.
+    required this.serviceId, // serviceId é obrigatório.
+    required this.serviceName, // serviceName é obrigatório.
+    required this.reservationDateTime, // reservationDateTime é obrigatório.
+    this.status = ReservationStatus.pending, // Status é opcional, padrão é pendente.
+    this.notes, // notes é opcional.
+  });
+
+  /// Cria uma nova instância de Reservation com valores copiados e/ou modificados.
+  Reservation copyWith({
+    int? id, // Novo ID (opcional).
+    int? userId, // Novo userId (opcional).
+    String? userName, // Novo userName (opcional).
+    int? serviceId, // Novo serviceId (opcional).
+    String? serviceName, // Novo serviceName (opcional).
+    DateTime? reservationDateTime, // Nova reservationDateTime (opcional).
+    ReservationStatus? status, // Novo status (opcional).
+    String? notes, // Novas notas (opcional).
+  }) => // Sintaxe de expressão para um construtor de cópia conciso.
+      Reservation(
+        id: id ?? this.id, // Se id for nulo, usa o id existente.
+        userId: userId ?? this.userId, // Se userId for nulo, usa o userId existente.
+        userName: userName ?? this.userName, // Se userName for nulo, usa o userName existente.
+        serviceId: serviceId ?? this.serviceId, // Se serviceId for nulo, usa o serviceId existente.
+        serviceName: serviceName ?? this.serviceName, // Se serviceName for nulo, usa o serviceName existente.
+        reservationDateTime: reservationDateTime ?? this.reservationDateTime, // Se reservationDateTime for nulo, usa o reservationDateTime existente.
+        status: status ?? this.status, // Se status for nulo, usa o status existente.
+        notes: notes ?? this.notes, // Se notes for nulo, usa as notes existentes.
+      );
+}
+
+// ------------------------------
+// State Notifiers (Controllers)
+// ------------------------------
+
+/// Gerencia o estado de autenticação do usuário.
+class AuthController extends StateNotifier<AuthState> {
+  final Ref _ref; // Adicionado para permitir acesso a outros provedores do Riverpod.
+  /// Construtor que inicializa o estado com AuthState padrão.
+  AuthController(this._ref) : super(const AuthState()); // Inicializa com um AuthState constante padrão.
+
+  static const String _fixedUserEmail = 'admin@vet.com'; // Email de usuário admin fixo.
+  static const String _fixedUserPass = '123456'; // Senha do usuário admin fixo.
+  static const String _fixedUserName = 'Admin Vet'; // Nome do usuário admin fixo.
+
+  // Mapa para armazenar detalhes de usuários registrados dinamicamente.
+  final Map<String, _RegisteredUserDetails> _registeredUsersDetails = {}; // Mapa para armazenar usuários registrados.
+
+  /// Tenta fazer login com o email e senha fornecidos.
+  Future<void> login(String email, String pass) async { // Método assíncrono para login.
+    // Define o estado para isLoading (carregando) e limpa quaisquer erros anteriores.
+    state = state.copyWith(isLoading: true, error: null, isEmailError: null, currentUser: null); // Atualiza o estado para indicar carregamento.
+    await Future<void>.delayed(const Duration(milliseconds: 800)); // Simula um atraso de rede de 800ms.
+
+    bool isAuthenticated = false; // Flag para indicar se a autenticação foi bem-sucedida.
+    UserProfile? userProfile; // Perfil do usuário, será definido se a autenticação for bem-sucedida.
+
+    // Verifica se as credenciais correspondem ao usuário fixo.
+    if (email == _fixedUserEmail && pass == _fixedUserPass) { // Compara com as credenciais do admin.
+      isAuthenticated = true; // Define como autenticado.
+      userProfile = UserProfile(id: 1, name: _fixedUserName, email: email); // Cria o perfil do admin.
+    }
+    // Ou verifica se as credenciais correspondem a um usuário registrado dinamicamente.
+    else if (_registeredUsersDetails.containsKey(email) && _registeredUsersDetails[email]!.password == pass) { // Verifica no mapa de usuários registrados.
+      isAuthenticated = true; // Define como autenticado.
+      userProfile = _registeredUsersDetails[email]!.userProfile; // Obtém o perfil do usuário registrado.
+    }
+
+    // Atualiza o estado com base no resultado da autenticação.
+    if (isAuthenticated) { // Se autenticado com sucesso.
+      state = state.copyWith(
+          isAuthed: true, // Define como autenticado.
+          isLoading: false, // Remove o estado de carregamento.
+          error: null, // Limpa qualquer erro.
+          isEmailError: null, // Limpa o erro de email.
+          currentUser: userProfile); // Define o usuário atual.
+    } else { // Se a autenticação falhar.
+      state = state.copyWith(
+          isAuthed: false, // Define como não autenticado.
+          isLoading: false, // Remove o estado de carregamento.
+          error: 'Cadastro inválido.', // Define uma mensagem de erro genérica.
+          isEmailError: false, // Indica que o erro não é especificamente do email.
+          currentUser: null); // Limpa o usuário atual.
+    }
+  }
+
+  /// Tenta registrar um novo usuário com o email, senha e nome fornecidos.
+  Future<void> register(String email, String password, String name) async { // Método assíncrono para registro.
+    // Define o estado para isLoading (carregando) e limpa quaisquer erros anteriores.
+    state = state.copyWith(isLoading: true, error: null, isEmailError: null, currentUser: null); // Atualiza o estado para indicar carregamento.
+    await Future<void>.delayed(const Duration(milliseconds: 1200)); // Simula um atraso de rede de 1.2 segundos.
+
+    // Verifica se o email já está registrado (fixo ou dinâmico).
+    if (_registeredUsersDetails.containsKey(email) || email == _fixedUserEmail) { // Checa se o email já existe.
+      state = state.copyWith(isLoading: false, error: 'Este email já está cadastrado.', isEmailError: true); // Define erro de email já cadastrado.
+      return; // Sai da função.
+    }
+
+    // Cria um novo perfil de usuário.
+    final UserProfile newUserProfile = UserProfile(id: email.hashCode.abs(), name: name, email: email); // Cria um novo UserProfile com um ID gerado.
+    // Armazena os detalhes do novo usuário.
+    _registeredUsersDetails[email] = _RegisteredUserDetails(password: password, userProfile: newUserProfile); // Adiciona o novo usuário ao mapa.
+
+    // Atualiza o estado indicando sucesso (sem erro e sem carregamento).
+    state = state.copyWith(isLoading: false, error: null, isEmailError: null); // Limpa o carregamento e erros, indicando sucesso.
+  }
+
+  /// Desloga o usuário, redefinindo o estado de autenticação para o padrão.
+  /// Também limpa o carrinho de compras e os favoritos.
+  void logout() { // Método para logout.
+    state = const AuthState(); // Redefine o estado de autenticação para o padrão.
+    _ref.read(cartProvider.notifier).clearCart(); // Limpa o carrinho de compras acessando seu notifier.
+    _ref.read(favoriteProvider.notifier).state = <int>[]; // Limpa os favoritos redefinindo seu estado para uma lista vazia.
+    _ref.read(reservationProvider.notifier).clearAllReservations(); // Limpa as reservas acessando seu notifier.
+  }
+}
+
+/// Gerencia a lista de produtos disponíveis.
+class ProductController extends StateNotifier<List<Product>> {
+  /// Construtor que inicializa o estado com uma lista de produtos iniciais.
+  ProductController() : super(_initialProducts); // Inicializa com a lista estática de produtos.
+
+  static const List<String> availableCategories = <String>['Remédios', 'Rações', 'Brinquedos']; // Categorias de produtos disponíveis.
+
+  // Lista estática de produtos iniciais.
+  static final List<Product> _initialProducts = <Product>[ // Lista privada de produtos iniciais.
+    Product(
+      id: 101, // ID do produto.
+      name: 'Anti-pulgas PetGuard', // Nome.
+      description: 'Proteção eficaz contra pulgas e carrapatos por 3 meses.', // Descrição.
+      price: 89.90, // Preço.
+      rxOnly: false, // Não requer receita.
+      imageUrl: 'https://images.tcdn.com.br/img/img_prod/469080/nexgard_antipulgas_caes_p_2kg_a_4kg_1_comprimido_boehringer_432_1_13f003e9c4b9fe1c31c67d5f5fb8f05f.png', // URL da imagem.
+      category: 'Remédios', // Categoria.
+    ),
+    Product(
+      id: 102,
+      name: 'Antibiótico AmoxPet 250mg',
+      description: 'Antibiótico de amplo espectro para infecções bacterianas.',
+      price: 65.50,
+      rxOnly: true, // Requer receita.
+      imageUrl: 'https://agrosolo.fbitsstatic.net/img/p/antibiotico-doxiciclina-doxitec-200mg-para-caes-16-comprimidos-89123/284689.jpg?w=700&h=700&v=202504291638',
+      category: 'Remédios',
+    ),
+    Product(
+      id: 103,
+      name: 'Vermífugo CanineCare',
+      description: 'Combate vermes intestinais em cães e gatos.',
+      price: 35.00,
+      rxOnly: false,
+      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT8DWzbB9P9VERuidx9GwdwebtgsszUawJ9lw&s',
+      category: 'Remédios',
+    ),
+    Product(
+      id: 201,
+      name: 'Ração Premium DogFit',
+      description: 'Alimento completo e balanceado para cães adultos.',
+      price: 120.00,
+      rxOnly: false,
+      imageUrl: 'https://www.petlove.com.br/images/products/273209/product/31027529907_Ra%C3%A7%C3%A3o_Seca_Dogfit_Gourmet_Carne_e_Vegetais_para_C%C3%A3es_Adultos_Porte_Pequeno_e_M%C3%A9dio_%281%29.jpg?1694521363',
+      category: 'Rações',
+    ),
+    Product(
+      id: 202,
+      name: 'Ração Hipoalergênica CatHealthy',
+      description: 'Fórmula especial para gatos com sensibilidade alimentar.',
+      price: 95.00,
+      rxOnly: false,
+      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTowFVywEowD88opffFHbChTD67XcEtLfv1Ug&s',
+      category: 'Rações',
+    ),
+    Product(
+      id: 203,
+      name: 'Petisco Dental Bites',
+      description: 'Ajuda a reduzir o tártaro e manter a higiene bucal.',
+      price: 25.00,
+      rxOnly: false,
+      imageUrl: 'https://http2.mlstatic.com/D_NQ_NP_605948-MLB47205197255_082021-O.webp',
+      category: 'Rações',
+    ),
+    Product(
+      id: 301,
+      name: 'Bola Interativa PetPlay',
+      description: 'Bola com dispenser de petiscos, estimula o raciocínio.',
+      price: 45.00,
+      rxOnly: false,
+      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR3KF-xAehT3_BC-l6WPI866EPVZFkCwAzdtw&s',
+      category: 'Brinquedos',
+    ),
+    Product(
+      id: 302,
+      name: 'Arranhador para Gatos Tower',
+      description: 'Torre de arranhar com várias plataformas e brinquedos pendurados.',
+      price: 180.00,
+      rxOnly: false,
+      imageUrl: 'https://m.media-amazon.com/images/I/61aAaZAExuL._UF1000,1000_QL80_.jpg',
+      category: 'Brinquedos',
+    ),
+    Product(
+      id: 303,
+      name: 'Corda de Roer para Cães',
+      description: 'Brinquedo resistente para cães que adoram mastigar.',
+      price: 30.00,
+      rxOnly: false,
+      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRbsbIIMKHjDlNv4hP7ZSH0a9-ZQ5xGslEbPw&s',
+      category: 'Brinquedos',
+    ),
+  ];
+
+  /// Adiciona um novo produto à lista.
+  void addProduct(Product product) { // Método para adicionar um produto.
+    // Generate a unique ID for the new product
+    final int newId = DateTime.now().microsecondsSinceEpoch; // Gera um ID único baseado no timestamp.
+    final Product newProductWithId = product.copyWith(id: newId); // Cria uma cópia do produto com o novo ID.
+    state = <Product>[...state, newProductWithId]; // Adiciona o novo produto à lista de estado.
+  }
+
+  /// Atualiza um produto existente na lista.
+  void updateProduct(Product updatedProduct) { // Método para atualizar um produto.
+    state = state.map<Product>((Product p) => p.id == updatedProduct.id ? updatedProduct : p).toList(); // Mapeia a lista, atualizando o produto com o ID correspondente.
+  }
+
+  /// Remove um produto da lista pelo seu ID.
+  void deleteProduct(int productId) { // Método para deletar um produto.
+    state = state.where((Product p) => p.id != productId).toList(); // Filtra a lista, removendo o produto com o ID especificado.
+  }
+
+  /// Retorna uma lista de produtos filtrados por categoria.
+  List<Product> getProductsByCategory(String category) { // Método para obter produtos por categoria.
+    return state.where((Product product) => product.category == category).toList(); // Filtra produtos pela categoria.
+  }
+}
+
+/// Gerencia o estado do carrinho de compras.
+class CartController extends StateNotifier<List<CartItem>> {
+  /// Construtor que inicializa o estado com uma lista de itens vazia.
+  CartController() : super(<CartItem>[]); // Inicializa com uma lista vazia de CartItem.
+
+  /// Adiciona um produto ao carrinho ou aumenta sua quantidade se já existir.
+  void addItem(Product product) { // Método para adicionar um item ao carrinho.
+    final List<CartItem> currentCart = List<CartItem>.from(state); // Cria uma cópia mutável do estado atual do carrinho.
+    final int index = currentCart.indexWhere((CartItem item) => item.product.id == product.id); // Encontra o índice do produto no carrinho.
+
+    if (index != -1) { // Se o produto já estiver no carrinho.
+      final CartItem existingItem = currentCart[index]; // Obtém o item existente.
+      currentCart[index] = existingItem.copyWith(quantity: existingItem.quantity + 1); // Aumenta a quantidade do item existente.
+    } else { // Se o produto não estiver no carrinho.
+      currentCart.add(CartItem(product: product, quantity: 1)); // Adiciona um novo CartItem com quantidade 1.
+    }
+    state = currentCart; // Atualiza o estado com a nova lista do carrinho.
+  }
+
+  /// Remove uma unidade de um produto do carrinho ou o remove completamente se a quantidade for 1.
+  void removeItem(Product product) { // Método para remover um item do carrinho.
+    final List<CartItem> currentCart = List<CartItem>.from(state); // Cria uma cópia mutável do estado atual.
+    final int index = currentCart.indexWhere((CartItem item) => item.product.id == product.id); // Encontra o índice do produto.
+
+    if (index != -1) { // Se o produto estiver no carrinho.
+      final CartItem existingItem = currentCart[index]; // Obtém o item existente.
+      if (existingItem.quantity > 1) { // Se a quantidade for maior que 1.
+        currentCart[index] = existingItem.copyWith(quantity: existingItem.quantity - 1); // Diminui a quantidade.
+      } else { // Se a quantidade for 1.
+        currentCart.removeAt(index); // Remove o item completamente.
+      }
+      state = currentCart; // Atualiza o estado.
+    }
+  }
+
+  /// Remove todas as unidades de um produto específico do carrinho.
+  void removeAllItemsOfProduct(Product product) { // Método para remover todas as unidades de um produto.
+    state = state.where((CartItem item) => item.product.id != product.id).toList(); // Filtra a lista, removendo todos os itens do produto especificado.
+  }
+
+  /// Esvazia completamente o carrinho.
+  void clearCart() { // Método para limpar o carrinho.
+    state = <CartItem>[]; // Redefine o estado para uma lista vazia.
+  }
+
+  /// Calcula o preço total de todos os itens no carrinho.
+  double getTotalPrice() { // Método para calcular o preço total.
+    return state.fold<double>( // Usa fold para somar os preços.
+        0.0, (double previousValue, CartItem item) => previousValue + (item.product.price * item.quantity)); // Acumula o preço de cada item.
+  }
+
+  /// Calcula a quantidade total de itens (unidades) no carrinho.
+  int getTotalQuantity() { // Método para calcular a quantidade total de unidades.
+    return state.fold<int>( // Usa fold para somar as quantidades.
+        0, (int previousValue, CartItem item) => previousValue + item.quantity); // Acumula a quantidade de cada item.
+  }
+
+  /// Verifica se um produto específico está no carrinho.
+  bool isInCart(Product product) { // Método para verificar se um produto está no carrinho.
+    return state.any((CartItem item) => item.product.id == product.id); // Retorna true se qualquer item no carrinho corresponder ao produto.
+  }
+
+  /// Retorna a quantidade de um produto específico no carrinho.
+  int getProductQuantity(Product product) { // Método para obter a quantidade de um produto específico.
+    final CartItem? item = state.firstWhereOrNull((CartItem item) => item.product.id == product.id); // Encontra o primeiro item que corresponde ao produto.
+    return item?.quantity ?? 0; // Retorna a quantidade do item ou 0 se não encontrado.
+  }
+}
+
+/// Gerencia a lista de produtos favoritos do usuário.
+class FavoriteController extends StateNotifier<List<int>> {
+  /// Construtor que inicializa o estado com uma lista vazia de IDs de produtos favoritos.
+  FavoriteController() : super(<int>[]); // Inicializa com uma lista vazia de IDs (int).
+
+  /// Alterna o status de favorito de um produto.
+  void toggleFavorite(int productId) { // Método para alternar o favorito.
+    if (state.contains(productId)) { // Se o produto já é favorito.
+      // Se o produto já é favorito, remove-o da lista.
+      state = state.where((int id) => id != productId).toList(); // Remove o ID da lista.
+    } else { // Se o produto não é favorito.
+      // Se o produto não é favorito, adiciona-o à lista.
+      state = <int>[...state, productId]; // Adiciona o ID à lista.
+    }
+  }
+
+  /// Verifica se um produto é favorito.
+  bool isFavorite(int productId) { // Método para verificar se um produto é favorito.
+    return state.contains(productId); // Retorna true se o ID estiver na lista de favoritos.
+  }
+}
+
+/// Gerencia a lista de serviços disponíveis.
+class ServiceController extends StateNotifier<List<Service>> {
+  /// Construtor que inicializa o estado com uma lista de serviços iniciais.
+  ServiceController() : super(_initialServices); // Inicializa com a lista estática de serviços.
+
+  // Lista estática de serviços iniciais.
+  static final List<Service> _initialServices = <Service>[ // Lista privada de serviços iniciais.
+    Service(
+      id: 1, // ID do serviço.
+      name: 'Consulta Veterinária', // Nome.
+      description: 'Consulta geral com um veterinário experiente para check-up ou avaliação de sintomas.', // Descrição.
+      price: 150.00, // Preço.
+      durationMinutes: 45, // Duração em minutos.
+      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTcApM5qMstjZBkBpZnqKHh6o-qId3Li0oqsg&s', // URL da imagem.
+    ),
+    Service(
+      id: 2,
+      name: 'Vacinação',
+      description: 'Aplicação de vacinas anuais ou de reforço para cães e gatos.',
+      price: 80.00,
+      durationMinutes: 30,
+      imageUrl: 'https://lh5.googleusercontent.com/proxy/Tx8ONB4BX49wi8XyQTbVe_8nV9TvdON4VaR7pd6T5Z5kkmo5by4Zo4VtDXCmC8SuQRucV60G9AcmtvsuVoZcJTwZXA0IbJQALesnlOCVcUUoUPLpzaFNi_XO2We-YJVgVuSeOEmUuAX8kDtrLufGA68dPi8WagKUPxaApH5MyQhn-86WVMie0kwyzxY',
+    ),
+    Service(
+      id: 3,
+      name: 'Banho e Tosa',
+      description: 'Serviço completo de banho, tosa e higiene para seu pet.',
+      price: 100.00,
+      durationMinutes: 90,
+      imageUrl: 'https://cdn-hjdpmen.nitrocdn.com/OdygPLcrrLyxbRgOKEndAYjdoPblKJCR/assets/images/optimized/rev-3bad09d/www.hovetpopular24h.com.br/wp-content/uploads/2020/07/estetica.png',
+    ),
+    Service(
+      id: 4,
+      name: 'Exame de Sangue',
+      description: 'Coleta e análise de amostra de sangue para diagnóstico e acompanhamento.',
+      price: 120.00,
+      durationMinutes: 20,
+      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQPxwXgMwlrLge_6mmktzWCafSPmQnumW1JhQ&s',
+    ),
+  ];
+
+  /// Retorna um serviço pelo seu ID.
+  Service? getServiceById(int id) { // Método para obter um serviço por ID.
+    return state.firstWhereOrNull((Service s) => s.id == id); // Encontra o primeiro serviço com o ID correspondente.
+  }
+}
+
+/// Gerencia a lista de reservas.
+class ReservationController extends StateNotifier<List<Reservation>> {
+  ReservationController() : super(<Reservation>[]); // Inicializa com uma lista vazia de reservas.
+
+  /// Adiciona uma nova reserva.
+  void makeReservation(Reservation newReservation) { // Método para fazer uma nova reserva.
+    final int newId = DateTime.now().microsecondsSinceEpoch; // Gera um ID único para a nova reserva.
+    state = <Reservation>[...state, newReservation.copyWith(id: newId)]; // Adiciona a nova reserva (com ID gerado) à lista.
+  }
+
+  /// Atualiza o status de uma reserva existente.
+  void updateReservationStatus(int reservationId, ReservationStatus newStatus) { // Método para atualizar o status de uma reserva.
+    state = state.map<Reservation>((Reservation r) { // Mapeia a lista de reservas.
+      return r.id == reservationId ? r.copyWith(status: newStatus) : r; // Atualiza o status da reserva com o ID correspondente.
+    }).toList(); // Converte de volta para List.
+  }
+
+  /// Cancela uma reserva (muda o status para cancelado).
+  void cancelReservation(int reservationId) { // Método para cancelar uma reserva.
+    updateReservationStatus(reservationId, ReservationStatus.cancelled); // Chama o método de atualização para definir o status como cancelado.
+  }
+
+  /// Retorna todas as reservas de um usuário específico.
+  List<Reservation> getReservationsForUser(int userId) { // Método para obter reservas de um usuário.
+    return state.where((Reservation r) => r.userId == userId).toList(); // Filtra as reservas pelo ID do usuário.
+  }
+
+  /// Limpa todas as reservas (útil para logout).
+  void clearAllReservations() { // Método para limpar todas as reservas.
+    state = <Reservation>[]; // Redefine o estado para uma lista vazia.
+  }
+}
+
+// ------------------------------
+// Riverpod Providers (Provedores Riverpod)
+// ------------------------------
+
+/// Provedor para o AuthController, gerenciando o estado de autenticação.
+final authProvider = StateNotifierProvider<AuthController, AuthState>((ref) { // Declara o provedor de autenticação.
+  return AuthController(ref); // Retorna uma nova instância de AuthController.
+});
+
+/// Provedor para o ProductController, gerenciando a lista de produtos.
+final productProvider = StateNotifierProvider<ProductController, List<Product>>((ref) { // Declara o provedor de produtos.
+  return ProductController(); // Retorna uma nova instância de ProductController.
+});
+
+/// Provedor para o CartController, gerenciando o carrinho de compras.
+final cartProvider = StateNotifierProvider<CartController, List<CartItem>>((ref) { // Declara o provedor do carrinho.
+  return CartController(); // Retorna uma nova instância de CartController.
+});
+
+/// Provedor para o FavoriteController, gerenciando a lista de produtos favoritos.
+final favoriteProvider = StateNotifierProvider<FavoriteController, List<int>>((ref) { // Declara o provedor de favoritos.
+  return FavoriteController(); // Retorna uma nova instância de FavoriteController.
+});
+
+/// Provedor para o ServiceController, gerenciando a lista de serviços disponíveis.
+final serviceProvider = StateNotifierProvider<ServiceController, List<Service>>((ref) { // Declara o provedor de serviços.
+  return ServiceController(); // Retorna uma nova instância de ServiceController.
+});
+
+/// Provedor para o ReservationController, gerenciando as reservas.
+final reservationProvider = StateNotifierProvider<ReservationController, List<Reservation>>((ref) { // Declara o provedor de reservas.
+  return ReservationController(); // Retorna uma nova instância de ReservationController.
+});
+
+// ------------------------------
+// UI Widgets (Widgets da Interface do Usuário)
+// ------------------------------
+
+/// Tela exibida após um registro bem-sucedido.
+class RegistrationSuccessScreen extends StatelessWidget {
+  final String registeredEmail; // O email com o qual o usuário foi registrado.
+  final String registeredName; // O nome com o qual o usuário foi registrado.
+
+  /// Construtor para RegistrationSuccessScreen.
+  const RegistrationSuccessScreen({super.key, required this.registeredEmail, required this.registeredName}); // Construtor com parâmetros obrigatórios.
+
+  @override
+  Widget build(BuildContext context) { // Método de construção da UI.
+    return Scaffold( // Estrutura básica da tela.
+      appBar: AppBar( // Barra superior.
+        title: const Text('Cadastro Concluído'), // Título da barra.
+        automaticallyImplyLeading: false, // Desabilita o botão de voltar automático.
+      ),
+      body: Center( // Centraliza o conteúdo.
+        child: Padding( // Adiciona preenchimento interno.
+          padding: const EdgeInsets.all(24.0), // Preenchimento de 24 pixels em todas as direções.
+          child: Column( // Organiza os widgets em uma coluna.
+            mainAxisAlignment: MainAxisAlignment.center, // Centraliza os filhos verticalmente.
+            children: <Widget>[ // Lista de filhos da coluna.
+              const Icon(Icons.check_circle_outline, size: 90, color: Colors.green), // Ícone de sucesso.
+              const SizedBox(height: 32.0), // Espaçamento vertical.
+              Text(
+                'Parabéns, $registeredName!', // Texto de parabéns com o nome do usuário.
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith( // Estilo do texto.
+                      color: Colors.green, // Cor verde.
+                      fontWeight: FontWeight.bold, // Negrito.
+                    ),
+                textAlign: TextAlign.center, // Alinhamento central.
+              ),
+              const SizedBox(height: 16.0), // Espaçamento vertical.
+              Text(
+                'Sua conta para "$registeredEmail" foi criada com sucesso.', // Mensagem de sucesso com o email.
+                style: Theme.of(context).textTheme.titleMedium, // Estilo do texto.
+                textAlign: TextAlign.center, // Alinhamento central.
+              ),
+              const SizedBox(height: 32.0), // Espaçamento vertical.
+              ElevatedButton( // Botão elevado.
+                onPressed: () { // Ação ao pressionar o botão.
+                  Navigator.of(context).pop(); // Volta para a tela anterior (login).
+                },
+                child: const Text('Voltar para o Login'), // Texto do botão.
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tela de login para os usuários.
+class LoginScreen extends ConsumerStatefulWidget { // Widget Stateful para permitir gerenciamento de estado local com Riverpod.
+  /// Construtor para LoginScreen.
+  const LoginScreen({super.key}); // Construtor constante.
+
+  @override
+  ConsumerState<LoginScreen> createState() => _LoginScreenState(); // Cria o estado mutável.
+}
+
+class _LoginScreenState extends ConsumerState<LoginScreen> { // Estado da tela de login.
+  final TextEditingController _emailController = TextEditingController(); // Controlador para o campo de email.
+  final TextEditingController _passwordController = TextEditingController(); // Controlador para o campo de senha.
+  String? _emailLocalError; // Erro de validação local para o email.
+  String? _passwordLocalError; // Erro de validação local para a senha.
+
+  @override
+  void dispose() { // Libera os recursos dos controladores quando o widget é descartado.
+    _emailController.dispose(); // Descarta o controlador de email.
+    _passwordController.dispose(); // Descarta o controlador de senha.
+    super.dispose(); // Chama o dispose da superclasse.
+  }
+
+  @override
+  Widget build(BuildContext context) { // Método de construção da UI.
+    final AuthState authState = ref.watch(authProvider); // Observa o estado de autenticação.
+
+    String? emailAuthError; // Variável para armazenar erro de autenticação relacionado ao email.
+    String? passwordAuthError; // Variável para armazenar erro de autenticação relacionado à senha.
+
+    if (authState.error != null && !authState.isLoading && !authState.isAuthed) { // Se houver um erro de autenticação, não está carregando e não está autenticado.
+      if (authState.isEmailError == true) { // Se o erro for de email.
+        emailAuthError = authState.error; // Atribui o erro ao campo de email.
+      } else if (authState.isEmailError == false) { // Se o erro não for de email (então é de senha ou geral).
+        passwordAuthError = authState.error; // Atribui o erro ao campo de senha.
+      }
+    }
+
+    return Scaffold( // Estrutura básica da tela.
+      appBar: AppBar( // Barra superior.
+        title: const Text('Entrar no Sistema'), // Título da barra.
+      ),
+      body: Center( // Centraliza o conteúdo.
+        child: SingleChildScrollView( // Permite rolagem se o conteúdo for maior que a tela.
+          padding: const EdgeInsets.all(24.0), // Preenchimento interno.
+          child: Column( // Organiza os widgets em uma coluna.
+            mainAxisAlignment: MainAxisAlignment.center, // Centraliza verticalmente.
+            children: <Widget>[ // Lista de filhos.
+              const Icon(Icons.pets, size: 90, color: Colors.pinkAccent), // Ícone de pet.
+              const SizedBox(height: 32.0), // Espaçamento.
+              Text(
+                'Bem-vindo ao VetApp', // Título de boas-vindas.
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith( // Estilo do texto.
+                      color: Colors.pinkAccent, // Cor rosa.
+                      fontWeight: FontWeight.bold, // Negrito.
+                    ),
+                textAlign: TextAlign.center, // Alinhamento central.
+              ),
+              const SizedBox(height: 32.0), // Espaçamento.
+              TextField( // Campo de texto para o email.
+                controller: _emailController, // Associa o controlador.
+                onChanged: (_) { // Quando o texto muda.
+                  if (_emailLocalError != null) { // Se houver um erro local.
+                    setState(() => _emailLocalError = null); // Limpa o erro local.
+                  }
+                },
+                decoration: InputDecoration( // Decoração do campo de texto.
+                  labelText: 'Email', // Rótulo.
+                  prefixIcon: const Icon(Icons.email), // Ícone de prefixo.
+                  hintText: 'admin@vet.com', // Texto de dica.
+                  errorText: _emailLocalError ?? emailAuthError, // Exibe erro local ou erro de autenticação.
+                ),
+                keyboardType: TextInputType.emailAddress, // Tipo de teclado para email.
+              ),
+              const SizedBox(height: 16.0), // Espaçamento.
+              TextField( // Campo de texto para a senha.
+                controller: _passwordController, // Associa o controlador.
+                onChanged: (_) { // Quando o texto muda.
+                  if (_passwordLocalError != null) { // Se houver um erro local.
+                    setState(() => _passwordLocalError = null); // Limpa o erro local.
+                  }
+                },
+                decoration: InputDecoration( // Decoração do campo de texto.
+                  labelText: 'Senha', // Rótulo.
+                  prefixIcon: const Icon(Icons.lock), // Ícone de prefixo.
+                  hintText: '123456', // Texto de dica.
+                  errorText: _passwordLocalError ?? passwordAuthError, // Exibe erro local ou erro de autenticação.
+                ),
+                obscureText: true, // Oculta o texto (para senhas).
+              ),
+              const SizedBox(height: 32.0), // Espaçamento.
+              if (authState.isLoading) // Se estiver carregando.
+                const CircularProgressIndicator() // Exibe um indicador de progresso.
+              else // Caso contrário.
+                ElevatedButton( // Botão de login.
+                  onPressed: () { // Ação ao pressionar o botão.
+                    final String email = _emailController.text.trim(); // Obtém o email, removendo espaços.
+                    final String password = _passwordController.text.trim(); // Obtém a senha, removendo espaços.
+
+                    bool hasLocalError = false; // Flag para erros de validação local.
+                    String? tempEmailError; // Erro temporário para email.
+                    String? tempPasswordError; // Erro temporário para senha.
+
+                    if (email.isEmpty) { // Se o email estiver vazio.
+                      tempEmailError = 'Por favor, preencha seu email.'; // Define mensagem de erro.
+                      hasLocalError = true; // Indica erro local.
+                    }
+                    if (password.isEmpty) { // Se a senha estiver vazia.
+                      tempPasswordError = 'Por favor, preencha sua senha.'; // Define mensagem de erro.
+                      hasLocalError = true; // Indica erro local.
+                    }
+
+                    setState(() { // Atualiza o estado do widget.
+                      _emailLocalError = tempEmailError; // Define o erro local do email.
+                      _passwordLocalError = tempPasswordError; // Define o erro local da senha.
+                    });
+
+                    if (hasLocalError) { // Se houver erros locais.
+                      return; // Impede o login.
+                    }
+
+                    ref.read(authProvider.notifier).state = authState.copyWith(error: null, isEmailError: null); // Limpa erros de autenticação anteriores.
+                    ref.read(authProvider.notifier).login(email, password); // Chama o método de login do AuthController.
+                  },
+                  style: ElevatedButton.styleFrom( // Estilo do botão.
+                    minimumSize: const Size.fromHeight(50), // Largura mínima de 50px de altura.
+                  ),
+                  child: const Text('Login'), // Texto do botão.
+                ),
+              const SizedBox(height: 20.0), // Espaçamento.
+              TextButton( // Botão de texto para cadastro.
+                onPressed: () { // Ação ao pressionar o botão.
+                  ref.read(authProvider.notifier).state = // Limpa erros de autenticação anteriores ao navegar.
+                      ref.read(authProvider.notifier).state.copyWith(error: null, isEmailError: null);
+                  Navigator.of(context).push( // Navega para a tela de registro.
+                    MaterialPageRoute<void>(
+                      builder: (BuildContext context) => const RegisterScreen(), // Constrói a tela de registro.
+                    ),
+                  );
+                },
+                child: const Text( // Texto do botão.
+                  'Não tem uma conta? Cadastre-se aqui!', // Chamada para ação.
+                  style: TextStyle(color: Colors.pinkAccent, fontSize: 16), // Estilo do texto.
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tela de registro para novos usuários.
+class RegisterScreen extends ConsumerStatefulWidget { // Widget Stateful para gerenciamento de estado local.
+  /// Construtor para RegisterScreen.
+  const RegisterScreen({super.key}); // Construtor constante.
+
+  @override
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState(); // Cria o estado mutável.
+}
+
+class _RegisterScreenState extends ConsumerState<RegisterScreen> { // Estado da tela de registro.
+  final TextEditingController _nameController = TextEditingController(); // Controlador para o campo de nome.
+  final TextEditingController _emailController = TextEditingController(); // Controlador para o campo de email.
+  final TextEditingController _passwordController = TextEditingController(); // Controlador para o campo de senha.
+  String? _nameLocalError; // Erro de validação local para o nome.
+  String? _emailLocalError; // Erro de validação local para o email.
+  String? _passwordLocalError; // Erro de validação local para a senha.
+
+  @override
+  void dispose() { // Libera os recursos dos controladores.
+    _nameController.dispose(); // Descarta o controlador de nome.
+    _emailController.dispose(); // Descarta o controlador de email.
+    _passwordController.dispose(); // Descarta o controlador de senha.
+    super.dispose(); // Chama o dispose da superclasse.
+  }
+
+  @override
+  Widget build(BuildContext context) { // Método de construção da UI.
+    final AuthState authState = ref.watch(authProvider); // Observa o estado de autenticação.
+
+    String? emailAuthError; // Variável para armazenar erro de autenticação relacionado ao email.
+
+    if (authState.error != null && !authState.isLoading) { // Se houver um erro de autenticação e não estiver carregando.
+      if (authState.isEmailError == true) { // Se o erro for de email.
+        emailAuthError = authState.error; // Atribui o erro ao campo de email.
+      }
+    }
+
+    ref.listen<AuthState>(authProvider, (AuthState? previous, AuthState current) { // Ouve mudanças no provedor de autenticação.
+      if (previous?.isLoading == true && !current.isLoading && current.error == null) { // Se antes estava carregando, agora não está, e não há erro.
+        Navigator.of(context).pushReplacement( // Navega e substitui a tela atual.
+          MaterialPageRoute<void>(
+            builder: (BuildContext context) => RegistrationSuccessScreen( // Constrói a tela de sucesso de registro.
+              registeredEmail: _emailController.text, // Passa o email registrado.
+              registeredName: _nameController.text, // Passa o nome registrado.
+            ),
+          ),
+        );
+      }
+    });
+
+    return Scaffold( // Estrutura básica da tela.
+      appBar: AppBar( // Barra superior.
+        title: const Text('Cadastro de Usuário'), // Título da barra.
+      ),
+      body: Center( // Centraliza o conteúdo.
+        child: SingleChildScrollView( // Permite rolagem.
+          padding: const EdgeInsets.all(24.0), // Preenchimento interno.
+          child: Column( // Organiza os widgets em uma coluna.
+            mainAxisAlignment: MainAxisAlignment.center, // Centraliza verticalmente.
+            children: <Widget>[ // Lista de filhos.
+              const Icon(Icons.person_add, size: 90, color: Colors.pinkAccent), // Ícone de adicionar pessoa.
+              const SizedBox(height: 32.0), // Espaçamento.
+              Text(
+                'Criar Nova Conta', // Título.
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith( // Estilo do texto.
+                      color: Colors.pinkAccent, // Cor rosa.
+                      fontWeight: FontWeight.bold, // Negrito.
+                    ),
+                textAlign: TextAlign.center, // Alinhamento central.
+              ),
+              const SizedBox(height: 32.0), // Espaçamento.
+              TextField( // Campo de texto para o nome.
+                controller: _nameController, // Associa o controlador.
+                onChanged: (_) { // Quando o texto muda.
+                  if (_nameLocalError != null) { // Se houver um erro local.
+                    setState(() => _nameLocalError = null); // Limpa o erro local.
+                  }
+                },
+                decoration: InputDecoration( // Decoração.
+                  labelText: 'Nome Completo', // Rótulo.
+                  prefixIcon: const Icon(Icons.person), // Ícone de prefixo.
+                  hintText: 'Seu nome', // Texto de dica.
+                  errorText: _nameLocalError, // Exibe erro local.
+                ),
+                keyboardType: TextInputType.name, // Tipo de teclado para nome.
+              ),
+              const SizedBox(height: 16.0), // Espaçamento.
+              TextField( // Campo de texto para o email.
+                controller: _emailController, // Associa o controlador.
+                onChanged: (_) { // Quando o texto muda.
+                  if (_emailLocalError != null) { // Se houver um erro local.
+                    setState(() => _emailLocalError = null); // Limpa o erro local.
+                  }
+                },
+                decoration: InputDecoration( // Decoração.
+                  labelText: 'Email', // Rótulo.
+                  prefixIcon: const Icon(Icons.email), // Ícone de prefixo.
+                  hintText: 'seu.email@exemplo.com', // Texto de dica.
+                  errorText: _emailLocalError ?? emailAuthError, // Exibe erro local ou erro de autenticação.
+                ),
+                keyboardType: TextInputType.emailAddress, // Tipo de teclado para email.
+              ),
+              const SizedBox(height: 16.0), // Espaçamento.
+              TextField( // Campo de texto para a senha.
+                controller: _passwordController, // Associa o controlador.
+                onChanged: (_) { // Quando o texto muda.
+                  if (_passwordLocalError != null) { // Se houver um erro local.
+                    setState(() => _passwordLocalError = null); // Limpa o erro local.
+                  }
+                },
+                decoration: InputDecoration( // Decoração.
+                  labelText: 'Senha', // Rótulo.
+                  prefixIcon: const Icon(Icons.lock), // Ícone de prefixo.
+                  hintText: '****', // Texto de dica.
+                  errorText: _passwordLocalError, // Exibe erro local.
+                ),
+                obscureText: true, // Oculta o texto.
+              ),
+              const SizedBox(height: 32.0), // Espaçamento.
+              if (authState.isLoading) // Se estiver carregando.
+                const CircularProgressIndicator() // Exibe indicador de progresso.
+              else // Caso contrário.
+                ElevatedButton( // Botão de cadastro.
+                  onPressed: () { // Ação ao pressionar o botão.
+                    final String name = _nameController.text.trim(); // Obtém o nome.
+                    final String email = _emailController.text.trim(); // Obtém o email.
+                    final String password = _passwordController.text.trim(); // Obtém a senha.
+
+                    bool hasLocalError = false; // Flag para erros locais.
+                    String? tempNameError; // Erro temporário para nome.
+                    String? tempEmailError; // Erro temporário para email.
+                    String? tempPasswordError; // Erro temporário para senha.
+
+                    if (name.isEmpty) { // Se o nome estiver vazio.
+                      tempNameError = 'Por favor, preencha seu nome.'; // Define mensagem de erro.
+                      hasLocalError = true; // Indica erro local.
+                    }
+                    if (email.isEmpty) { // Se o email estiver vazio.
+                      tempEmailError = 'Por favor, preencha seu email para cadastro.'; // Define mensagem de erro.
+                      hasLocalError = true; // Indica erro local.
+                    }
+                    if (password.isEmpty) { // Se a senha estiver vazia.
+                      tempPasswordError = 'Por favor, preencha sua senha para cadastro.'; // Define mensagem de erro.
+                      hasLocalError = true; // Indica erro local.
+                    }
+
+                    setState(() { // Atualiza o estado.
+                      _nameLocalError = tempNameError; // Define erro local do nome.
+                      _emailLocalError = tempEmailError; // Define erro local do email.
+                      _passwordLocalError = tempPasswordError; // Define erro local da senha.
+                    });
+
+                    if (hasLocalError) { // Se houver erros locais.
+                      return; // Impede o cadastro.
+                    }
+
+                    ref.read(authProvider.notifier).state = authState.copyWith(error: null, isEmailError: null); // Limpa erros de autenticação anteriores.
+                    ref.read(authProvider.notifier).register(email, password, name); // Chama o método de registro do AuthController.
+                  },
+                  style: ElevatedButton.styleFrom( // Estilo do botão.
+                    minimumSize: const Size.fromHeight(50), // Largura mínima.
+                  ),
+                  child: const Text('Cadastrar'), // Texto do botão.
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Cartão de exibição para um único produto.
+class ProductCard extends ConsumerWidget { // Widget stateless que consome dados do Riverpod.
+  final Product product; // O produto a ser exibido.
+
+  /// Construtor para ProductCard.
+  const ProductCard({super.key, required this.product}); // Construtor com parâmetro obrigatório.
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) { // Método de construção da UI.
+    return Card( // Cartão visual.
+      margin: const EdgeInsets.symmetric(vertical: 8.0), // Margem vertical.
+      elevation: 2, // Elevação do cartão.
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), // Borda arredondada.
+      child: Padding( // Adiciona preenchimento interno.
+        padding: const EdgeInsets.all(16.0), // Preenchimento em todas as direções.
+        child: Column( // Organiza o conteúdo em coluna.
+          crossAxisAlignment: CrossAxisAlignment.start, // Alinha os filhos à esquerda.
+          children: <Widget>[ // Lista de filhos.
+            Row( // Linha para imagem e detalhes.
+              crossAxisAlignment: CrossAxisAlignment.start, // Alinha os filhos ao topo.
+              children: <Widget>[ // Lista de filhos.
+                ClipRRect( // Recorta a imagem em um retângulo arredondado.
+                  borderRadius: BorderRadius.circular(8.0), // Raio da borda.
+                  child: Image.network( // Imagem carregada da rede.
+                    product.imageUrl ?? 'https://www.gstatic.com/flutter-onestack-prototype/genui/example_1.jpg', // URL da imagem ou placeholder.
+                    width: 80, // Largura da imagem.
+                    height: 80, // Altura da imagem.
+                    fit: BoxFit.cover, // Ajusta a imagem para cobrir o espaço.
+                    errorBuilder: (BuildContext context, Object error, StackTrace? stackTrace) => Container( // Construtor de erro para imagem.
+                      width: 80, // Largura do container de erro.
+                      height: 80, // Altura do container de erro.
+                      color: Colors.grey[200], // Cor de fundo cinza.
+                      child: const Icon(Icons.image_not_supported, color: Colors.grey), // Ícone de imagem não suportada.
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16.0), // Espaçamento horizontal.
+                Expanded( // Expande o widget para preencher o espaço restante.
+                  child: Column( // Coluna para nome, descrição e preço.
+                    crossAxisAlignment: CrossAxisAlignment.start, // Alinha à esquerda.
+                    children: <Widget>[ // Lista de filhos.
+                      Text(
+                        product.name, // Nome do produto.
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), // Estilo negrito.
+                        maxLines: 2, // Máximo de 2 linhas.
+                        overflow: TextOverflow.ellipsis, // Adiciona '...' se o texto exceder.
+                      ),
+                      const SizedBox(height: 4.0), // Espaçamento.
+                      Text(
+                        product.description, // Descrição do produto.
+                        style: Theme.of(context).textTheme.bodyMedium, // Estilo do corpo do texto.
+                        maxLines: 3, // Máximo de 3 linhas.
+                        overflow: TextOverflow.ellipsis, // Adiciona '...' se o texto exceder.
+                      ),
+                      const SizedBox(height: 8.0), // Espaçamento.
+                      Row( // Linha para preço e status "com receita".
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween, // Espaço entre os filhos.
+                        children: <Widget>[ // Lista de filhos.
+                          Text(
+                            'R\$ ${product.price.toStringAsFixed(2)}', // Preço formatado.
+                            style: Theme.of(context)
+                                .textTheme.titleSmall?.copyWith(color: Colors.green[700], fontWeight: FontWeight.bold), // Estilo verde e negrito.
+                          ),
+                          if (product.rxOnly) // Se o produto requer receita.
+                            Chip( // Chip de informação.
+                              label: const Text('Com receita', style: TextStyle(fontSize: 12, color: Colors.white)), // Texto do chip.
+                              backgroundColor: Colors.red[400], // Cor de fundo do chip.
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, // Reduz o tamanho da área de toque.
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Consumer( // Usa Consumer para reconstruir apenas uma parte do widget.
+                  builder: (BuildContext context, WidgetRef ref, Widget? child) { // Construtor do Consumer.
+                    final bool isProductFavorite = ref.watch(favoriteProvider).contains(product.id); // Verifica se o produto é favorito.
+                    return Align( // Alinha o botão de favorito.
+                      alignment: Alignment.topRight, // Alinha ao canto superior direito.
+                      child: IconButton( // Botão de ícone.
+                        icon: Icon( // Ícone de favorito (preenchido ou contorno).
+                          isProductFavorite ? Icons.favorite : Icons.favorite_border, // Define o ícone com base no status de favorito.
+                          color: isProductFavorite ? Colors.red : Colors.grey, // Define a cor do ícone.
+                        ),
+                        onPressed: () { // Ação ao pressionar o botão.
+                          ref.read(favoriteProvider.notifier).toggleFavorite(product.id); // Alterna o status de favorito.
+                          ScaffoldMessenger.of(context).showSnackBar( // Exibe um SnackBar.
+                            SnackBar(
+                              content: Text(isProductFavorite // Mensagem do SnackBar.
+                                  ? '${product.name} removido dos favoritos!'
+                                  : '${product.name} adicionado aos favoritos!'),
+                              duration: const Duration(seconds: 1), // Duração do SnackBar.
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16.0), // Espaçamento.
+            SizedBox( // Garante que o botão ocupe toda a largura disponível.
+              width: double.infinity, // Largura máxima.
+              child: ElevatedButton.icon( // Botão elevado com ícone.
+                icon: const Icon(Icons.add_shopping_cart, size: 20), // Ícone de carrinho.
+                label: const Text('Adicionar ao Carrinho', style: TextStyle(fontSize: 16)), // Texto do botão.
+                onPressed: () { // Ação ao pressionar o botão.
+                  ref.read(cartProvider.notifier).addItem(product); // Adiciona o produto ao carrinho.
+                  ScaffoldMessenger.of(context).showSnackBar( // Exibe um SnackBar.
+                    SnackBar(
+                      content: Text('${product.name} adicionado ao carrinho!'), // Mensagem de confirmação.
+                      duration: const Duration(seconds: 1), // Duração do SnackBar.
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Tela de exibição do carrinho de compras.
+class CartScreen extends ConsumerWidget { // Widget stateless que consome dados do Riverpod.
+  /// Construtor para CartScreen.
+  const CartScreen({super.key}); // Construtor constante.
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) { // Método de construção da UI.
+    final List<CartItem> cartItems = ref.watch(cartProvider); // Observa a lista de itens no carrinho.
+    final CartController cartController = ref.read(cartProvider.notifier); // Obtém o controlador do carrinho.
+    final double totalPrice = cartController.getTotalPrice(); // Calcula o preço total.
+
+    return Scaffold( // Estrutura básica da tela.
+      appBar: AppBar( // Barra superior.
+        title: const Text('Meu Carrinho'), // Título da barra.
+      ),
+      body: cartItems.isEmpty // Se o carrinho estiver vazio.
+          ? Center( // Centraliza o conteúdo.
+              child: Column( // Organiza em coluna.
+                mainAxisAlignment: MainAxisAlignment.center, // Centraliza verticalmente.
+                children: <Widget>[ // Lista de filhos.
+                  const Icon(Icons.shopping_cart_outlined, size: 90, color: Colors.grey), // Ícone de carrinho vazio.
+                  const SizedBox(height: 24), // Espaçamento.
+                  Text(
+                    'Seu carrinho está vazio!', // Mensagem de carrinho vazio.
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.grey[600]), // Estilo do texto.
+                  ),
+                  const SizedBox(height: 16), // Espaçamento.
+                  ElevatedButton( // Botão para continuar comprando.
+                    onPressed: () { // Ação ao pressionar.
+                      Navigator.of(context).pop(); // Volta para a tela anterior.
+                    },
+                    child: const Text('Continuar Comprando'), // Texto do botão.
+                  ),
+                ],
+              ),
+            )
+          : Column( // Se o carrinho não estiver vazio, exibe os itens e o total.
+              children: <Widget>[ // Lista de filhos.
+                Expanded( // Expande a lista de itens para preencher o espaço.
+                  child: ListView.builder( // Constrói uma lista de itens.
+                    padding: const EdgeInsets.all(16.0), // Preenchimento da lista.
+                    itemCount: cartItems.length, // Número de itens na lista.
+                    itemBuilder: (BuildContext context, int index) { // Construtor de itens da lista.
+                      final CartItem item = cartItems[index]; // Obtém o item do carrinho.
+                      return Card( // Cartão para cada item do carrinho.
+                        margin: const EdgeInsets.symmetric(vertical: 8.0), // Margem vertical.
+                        elevation: 2, // Elevação.
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), // Borda arredondada.
+                        child: Padding( // Preenchimento interno.
+                          padding: const EdgeInsets.all(16.0), // Preenchimento.
+                          child: Row( // Linha para imagem e detalhes do item.
+                            crossAxisAlignment: CrossAxisAlignment.start, // Alinha ao topo.
+                            children: <Widget>[ // Lista de filhos.
+                              ClipRRect( // Recorta a imagem.
+                                borderRadius: BorderRadius.circular(8.0), // Borda arredondada.
+                                child: Image.network( // Imagem da rede.
+                                  item.product.imageUrl ?? 'https://www.gstatic.com/flutter-onestack-prototype/genui/example_1.jpg', // URL da imagem ou placeholder.
+                                  width: 60, // Largura.
+                                  height: 60, // Altura.
+                                  fit: BoxFit.cover, // Ajusta a imagem.
+                                  errorBuilder: (BuildContext context, Object error, StackTrace? stackTrace) => Container( // Construtor de erro.
+                                    width: 60, // Largura.
+                                    height: 60, // Altura.
+                                    color: Colors.grey[200], // Cor de fundo.
+                                    child: const Icon(Icons.image_not_supported, color: Colors.grey), // Ícone de erro.
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16.0), // Espaçamento.
+                              Expanded( // Expande para preencher o espaço.
+                                child: Column( // Coluna para detalhes.
+                                  crossAxisAlignment: CrossAxisAlignment.start, // Alinha à esquerda.
+                                  children: <Widget>[ // Lista de filhos.
+                                    Text(
+                                      item.product.name, // Nome do produto.
+                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), // Estilo negrito.
+                                      maxLines: 2, // Máximo de 2 linhas.
+                                      overflow: TextOverflow.ellipsis, // '...'.
+                                    ),
+                                    const SizedBox(height: 4.0), // Espaçamento.
+                                    Text(
+                                      'R\$ ${item.product.price.toStringAsFixed(2)}', // Preço do produto.
+                                      style: Theme.of(context)
+                                          .textTheme.titleSmall?.copyWith(color: Colors.green[700]), // Estilo verde.
+                                    ),
+                                    const SizedBox(height: 8.0), // Espaçamento.
+                                    Row( // Linha para controles de quantidade e exclusão.
+                                      children: <Widget>[ // Lista de filhos.
+                                        IconButton( // Botão para diminuir quantidade.
+                                          icon: const Icon(Icons.remove_circle_outline, color: Colors.red), // Ícone de remover.
+                                          onPressed: () => cartController.removeItem(item.product), // Chama para remover item.
+                                        ),
+                                        Text(
+                                          '${item.quantity}', // Quantidade atual.
+                                          style: Theme.of(context).textTheme.titleMedium, // Estilo do texto.
+                                        ),
+                                        IconButton( // Botão para aumentar quantidade.
+                                          icon: const Icon(Icons.add_circle_outline, color: Colors.green), // Ícone de adicionar.
+                                          onPressed: () => cartController.addItem(item.product), // Chama para adicionar item.
+                                        ),
+                                        const Spacer(), // Espaçador para empurrar o botão de exclusão para a direita.
+                                        IconButton( // Botão para remover todas as unidades do produto.
+                                          icon: const Icon(Icons.delete, color: Colors.grey), // Ícone de lixeira.
+                                          onPressed: () => cartController.removeAllItemsOfProduct(item.product), // Chama para remover todas as unidades.
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                Padding( // Preenchimento para a seção de total e botões.
+                  padding: const EdgeInsets.all(16.0), // Preenchimento.
+                  child: Column( // Coluna para total e botões.
+                    children: <Widget>[ // Lista de filhos.
+                      Row( // Linha para o texto "Total" e o valor.
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween, // Espaço entre os filhos.
+                        children: <Widget>[ // Lista de filhos.
+                          Text(
+                            'Total:', // Texto "Total".
+                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold), // Estilo negrito.
+                          ),
+                          Text(
+                            'R\$ ${totalPrice.toStringAsFixed(2)}', // Preço total formatado.
+                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.bold, // Negrito.
+                                  color: Colors.green[700], // Cor verde.
+                                ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16), // Espaçamento.
+                      SizedBox( // Garante que o botão ocupe toda a largura.
+                        width: double.infinity, // Largura máxima.
+                        child: ElevatedButton.icon( // Botão para finalizar compra.
+                          icon: const Icon(Icons.payment), // Ícone de pagamento.
+                          label: const Text('Finalizar Compra'), // Texto do botão.
+                          onPressed: () { // Ação ao pressionar.
+                            if (cartItems.isNotEmpty) { // Se o carrinho não estiver vazio.
+                              cartController.clearCart(); // Limpa o carrinho.
+                              ScaffoldMessenger.of(context).showSnackBar( // Exibe um SnackBar.
+                                const SnackBar(
+                                  content: Text('Compra finalizada com sucesso!'), // Mensagem de sucesso.
+                                  duration: Duration(seconds: 2), // Duração.
+                                ),
+                              );
+                              Navigator.of(context).pop(); // Volta para a tela anterior.
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 8), // Espaçamento.
+                      SizedBox( // Garante que o botão ocupe toda a largura.
+                        width: double.infinity, // Largura máxima.
+                        child: TextButton.icon( // Botão para limpar carrinho.
+                          icon: const Icon(Icons.remove_shopping_cart, color: Colors.red), // Ícone de remover carrinho.
+                          label: const Text('Limpar Carrinho', style: TextStyle(color: Colors.red)), // Texto vermelho.
+                          onPressed: () { // Ação ao pressionar.
+                            if (cartItems.isNotEmpty) { // Se o carrinho não estiver vazio.
+                              cartController.clearCart(); // Limpa o carrinho.
+                              ScaffoldMessenger.of(context).showSnackBar( // Exibe um SnackBar.
+                                const SnackBar(
+                                  content: Text('Carrinho esvaziado!'), // Mensagem de carrinho esvaziado.
+                                  duration: Duration(seconds: 1), // Duração.
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+/// Cartão de exibição para um item favorito.
+class FavoriteItemCard extends ConsumerWidget { // Widget stateless que consome dados do Riverpod.
+  final Product product; // O produto favorito a ser exibido.
+
+  /// Construtor para FavoriteItemCard.
+  const FavoriteItemCard({super.key, required this.product}); // Construtor com parâmetro obrigatório.
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) { // Método de construção da UI.
+    return Card( // Cartão visual.
+      margin: const EdgeInsets.symmetric(vertical: 8.0), // Margem vertical.
+      elevation: 2, // Elevação.
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), // Borda arredondada.
+      child: Padding( // Preenchimento interno.
+        padding: const EdgeInsets.all(16.0), // Preenchimento.
+        child: Row( // Linha para imagem e detalhes.
+          crossAxisAlignment: CrossAxisAlignment.start, // Alinha ao topo.
+          children: <Widget>[ // Lista de filhos.
+            ClipRRect( // Recorta a imagem.
+              borderRadius: BorderRadius.circular(8.0), // Borda arredondada.
+              child: Image.network( // Imagem da rede.
+                product.imageUrl ?? 'https://www.gstatic.com/flutter-onestack-prototype/genui/example_1.jpg', // URL ou placeholder.
+                width: 60, // Largura.
+                height: 60, // Altura.
+                fit: BoxFit.cover, // Ajusta a imagem.
+                errorBuilder: (BuildContext context, Object error, StackTrace? stackTrace) => Container( // Construtor de erro.
+                  width: 60, // Largura.
+                  height: 60, // Altura.
+                  color: Colors.grey[200], // Cor de fundo.
+                  child: const Icon(Icons.image_not_supported, color: Colors.grey), // Ícone de erro.
+                ),
+              ),
+            ),
+            const SizedBox(width: 16.0), // Espaçamento.
+            Expanded( // Expande para preencher o espaço.
+              child: Column( // Coluna para detalhes.
+                crossAxisAlignment: CrossAxisAlignment.start, // Alinha à esquerda.
+                children: <Widget>[ // Lista de filhos.
+                  Text(
+                    product.name, // Nome do produto.
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), // Estilo negrito.
+                    maxLines: 2, // Máximo de 2 linhas.
+                    overflow: TextOverflow.ellipsis, // '...'.
+                  ),
+                  const SizedBox(height: 4.0), // Espaçamento.
+                  Text(
+                    'R\$ ${product.price.toStringAsFixed(2)}', // Preço do produto.
+                    style: Theme.of(context)
+                        .textTheme.titleSmall?.copyWith(color: Colors.green[700]), // Estilo verde.
+                  ),
+                  if (product.rxOnly) ...<Widget>[ // Se requer receita, exibe o chip.
+                    const SizedBox(height: 4.0), // Espaçamento.
+                    Chip( // Chip de informação.
+                      label: const Text('Com receita', style: TextStyle(fontSize: 12, color: Colors.white)), // Texto do chip.
+                      backgroundColor: Colors.red[400], // Cor de fundo do chip.
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, // Reduz o tamanho da área de toque.
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            IconButton( // Botão para remover dos favoritos.
+              icon: const Icon(Icons.favorite, color: Colors.red), // Ícone de favorito preenchido (vermelho).
+              onPressed: () { // Ação ao pressionar.
+                ref.read(favoriteProvider.notifier).toggleFavorite(product.id); // Remove o produto dos favoritos.
+                ScaffoldMessenger.of(context).showSnackBar( // Exibe um SnackBar.
+                  SnackBar(
+                    content: Text('${product.name} removido dos favoritos!'), // Mensagem de remoção.
+                    duration: const Duration(seconds: 1), // Duração.
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Tela para exibir produtos favoritos.
+class FavoritesScreen extends ConsumerWidget { // Widget stateless que consome dados do Riverpod.
+  /// Construtor para FavoritesScreen.
+  const FavoritesScreen({super.key}); // Construtor constante.
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) { // Método de construção da UI.
+    final List<int> favoriteProductIds = ref.watch(favoriteProvider); // Observa os IDs dos produtos favoritos.
+    final List<Product> allProducts = ref.watch(productProvider); // Observa todos os produtos disponíveis.
+
+    final List<Product> favoriteProducts = allProducts // Filtra todos os produtos para encontrar os favoritos.
+        .where((Product product) => favoriteProductIds.contains(product.id))
+        .toList(); // Converte para lista.
+
+    return Scaffold( // Estrutura básica da tela.
+      appBar: AppBar( // Barra superior.
+        title: const Text('Meus Favoritos'), // Título da barra.
+      ),
+      body: favoriteProducts.isEmpty // Se não houver produtos favoritos.
+          ? Center( // Centraliza o conteúdo.
+              child: Column( // Organiza em coluna.
+                mainAxisAlignment: MainAxisAlignment.center, // Centraliza verticalmente.
+                children: <Widget>[ // Lista de filhos.
+                  const Icon(Icons.favorite_border, size: 90, color: Colors.grey), // Ícone de coração vazio.
+                  const SizedBox(height: 24), // Espaçamento.
+                  Text(
+                    'Você não tem produtos favoritos ainda!', // Mensagem.
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.grey[600]), // Estilo do texto.
+                  ),
+                  const SizedBox(height: 16), // Espaçamento.
+                  ElevatedButton( // Botão para começar a favoritar.
+                    onPressed: () { // Ação ao pressionar.
+                      Navigator.of(context).pop(); // Volta para a tela anterior.
+                    },
+                    child: const Text('Começar a Favoritar'), // Texto do botão.
+                  ),
+                ],
+              ),
+            )
+          : ListView.builder( // Se houver favoritos, exibe-os em uma lista.
+              padding: const EdgeInsets.all(16.0), // Preenchimento da lista.
+              itemCount: favoriteProducts.length, // Número de produtos favoritos.
+              itemBuilder: (BuildContext context, int index) { // Construtor de itens.
+                final Product product = favoriteProducts[index]; // Obtém o produto favorito.
+                return FavoriteItemCard(product: product); // Exibe o cartão do item favorito.
+              },
+            ),
+    );
+  }
+}
+
+/// Formulário para adicionar ou editar um produto.
+class ProductFormScreen extends ConsumerStatefulWidget { // Widget Stateful para gerenciamento de estado local.
+  final Product? product; // Produto a ser editado (nulo se for para adicionar um novo).
+
+  const ProductFormScreen({super.key, this.product}); // Construtor.
+
+  @override
+  ConsumerState<ProductFormScreen> createState() => _ProductFormScreenState(); // Cria o estado mutável.
+}
+
+class _ProductFormScreenState extends ConsumerState<ProductFormScreen> { // Estado do formulário de produto.
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>(); // Chave global para o formulário.
+  late TextEditingController _nameController; // Controlador para o nome.
+  late TextEditingController _descriptionController; // Controlador para a descrição.
+  late TextEditingController _priceController; // Controlador para o preço.
+  late TextEditingController _imageUrlController; // Controlador para a URL da imagem.
+  late bool _rxOnly; // Estado do switch "requer receita".
+  late String _selectedCategory; // Categoria selecionada.
+
+  @override
+  void initState() { // Inicializa o estado.
+    super.initState(); // Chama o initState da superclasse.
+    _nameController = TextEditingController(text: widget.product?.name ?? ''); // Inicializa com o nome do produto ou vazio.
+    _descriptionController = TextEditingController(text: widget.product?.description ?? ''); // Inicializa com a descrição ou vazio.
+    _priceController = TextEditingController(text: widget.product?.price.toStringAsFixed(2) ?? ''); // Inicializa com o preço formatado ou vazio.
+    _imageUrlController = TextEditingController(text: widget.product?.imageUrl ?? ''); // Inicializa com a URL da imagem ou vazio.
+    _rxOnly = widget.product?.rxOnly ?? false; // Inicializa com o status rxOnly ou false.
+    _selectedCategory = widget.product?.category ?? ProductController.availableCategories.first; // Inicializa com a categoria ou a primeira da lista.
+  }
+
+  @override
+  void dispose() { // Libera os recursos dos controladores.
+    _nameController.dispose(); // Descarta o controlador de nome.
+    _descriptionController.dispose(); // Descarta o controlador de descrição.
+    _priceController.dispose(); // Descarta o controlador de preço.
+    _imageUrlController.dispose(); // Descarta o controlador de URL da imagem.
+    super.dispose(); // Chama o dispose da superclasse.
+  }
+
+  void _saveProduct() { // Lógica para salvar o produto.
+    if (_formKey.currentState!.validate()) { // Se o formulário for validado com sucesso.
+      final String name = _nameController.text.trim(); // Obtém o nome.
+      final String description = _descriptionController.text.trim(); // Obtém a descrição.
+      final double price = double.parse(_priceController.text.replaceAll(',', '.')); // Obtém o preço, substituindo vírgula por ponto.
+      final String? imageUrl = _imageUrlController.text.trim().isEmpty ? null : _imageUrlController.text.trim(); // Obtém a URL da imagem ou nulo se vazia.
+
+      final Product newOrUpdatedProduct = Product( // Cria um novo ou atualizado objeto Product.
+        id: widget.product?.id ?? 0, // Usa o ID existente ou 0 (será gerado pelo controller se for novo).
+        name: name, // Nome do produto.
+        description: description, // Descrição.
+        price: price, // Preço.
+        rxOnly: _rxOnly, // Requer receita.
+        imageUrl: imageUrl, // URL da imagem.
+        category: _selectedCategory, // Categoria.
+      );
+
+      if (widget.product == null) { // Se for um novo produto.
+        // Adding new product
+        ref.read(productProvider.notifier).addProduct(newOrUpdatedProduct); // Adiciona o produto.
+        ScaffoldMessenger.of(context).showSnackBar( // Exibe SnackBar.
+          SnackBar(content: Text('${name} adicionado com sucesso!')), // Mensagem de sucesso.
+        );
+      } else { // Se for um produto existente.
+        // Updating existing product
+        ref.read(productProvider.notifier).updateProduct(newOrUpdatedProduct); // Atualiza o produto.
+        ScaffoldMessenger.of(context).showSnackBar( // Exibe SnackBar.
+          SnackBar(content: Text('${name} atualizado com sucesso!')), // Mensagem de sucesso.
+        );
+      }
+      Navigator.of(context).pop(); // Volta para a tela anterior.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) { // Método de construção da UI.
+    return Scaffold( // Estrutura básica da tela.
+      appBar: AppBar( // Barra superior.
+        title: Text(widget.product == null ? 'Adicionar Produto' : 'Editar Produto'), // Título dinâmico.
+      ),
+      body: SingleChildScrollView( // Permite rolagem.
+        padding: const EdgeInsets.all(16.0), // Preenchimento.
+        child: Form( // Formulário para validação.
+          key: _formKey, // Associa a chave global.
+          child: Column( // Organiza em coluna.
+            children: <Widget>[ // Lista de filhos.
+              TextFormField( // Campo de texto para o nome.
+                controller: _nameController, // Associa o controlador.
+                decoration: const InputDecoration( // Decoração.
+                  labelText: 'Nome do Produto', // Rótulo.
+                  prefixIcon: Icon(Icons.shopping_bag), // Ícone.
+                ),
+                validator: (String? value) { // Validador.
+                  if (value == null || value.isEmpty) { // Se o valor for nulo ou vazio.
+                    return 'O nome do produto não pode ser vazio.'; // Mensagem de erro.
+                  }
+                  return null; // Nulo se válido.
+                },
+              ),
+              const SizedBox(height: 16), // Espaçamento.
+              TextFormField( // Campo de texto para a descrição.
+                controller: _descriptionController, // Associa o controlador.
+                decoration: const InputDecoration( // Decoração.
+                  labelText: 'Descrição', // Rótulo.
+                  prefixIcon: Icon(Icons.description), // Ícone.
+                ),
+                maxLines: 3, // Máximo de 3 linhas.
+                validator: (String? value) { // Validador.
+                  if (value == null || value.isEmpty) { // Se o valor for nulo ou vazio.
+                    return 'A descrição não pode ser vazia.'; // Mensagem de erro.
+                  }
+                  return null; // Nulo se válido.
+                },
+              ),
+              const SizedBox(height: 16), // Espaçamento.
+              TextFormField( // Campo de texto para o preço.
+                controller: _priceController, // Associa o controlador.
+                decoration: const InputDecoration( // Decoração.
+                  labelText: 'Preço', // Rótulo.
+                  prefixIcon: Icon(Icons.attach_money), // Ícone.
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true), // Tipo de teclado numérico com decimal.
+                validator: (String? value) { // Validador.
+                  if (value == null || value.isEmpty) { // Se o valor for nulo ou vazio.
+                    return 'O preço não pode ser vazio.'; // Mensagem de erro.
+                  }
+                  if (double.tryParse(value.replaceAll(',', '.')) == null) { // Tenta converter para double, substituindo vírgula por ponto.
+                    return 'Insira um preço válido.'; // Mensagem de erro.
+                  }
+                  return null; // Nulo se válido.
+                },
+              ),
+              const SizedBox(height: 16), // Espaçamento.
+              TextFormField( // Campo de texto para a URL da imagem.
+                controller: _imageUrlController, // Associa o controlador.
+                decoration: const InputDecoration( // Decoração.
+                  labelText: 'URL da Imagem (opcional)', // Rótulo.
+                  prefixIcon: Icon(Icons.image), // Ícone.
+                ),
+                keyboardType: TextInputType.url, // Tipo de teclado para URL.
+              ),
+              const SizedBox(height: 16), // Espaçamento.
+              DropdownButtonFormField<String>( // Campo de seleção para categoria.
+                value: _selectedCategory, // Valor selecionado.
+                decoration: const InputDecoration( // Decoração.
+                  labelText: 'Categoria', // Rótulo.
+                  prefixIcon: Icon(Icons.category), // Ícone.
+                ),
+                items: ProductController.availableCategories.map<DropdownMenuItem<String>>((String category) { // Mapeia as categorias para DropdownMenuItem.
+                  return DropdownMenuItem<String>( // Item do dropdown.
+                    value: category, // Valor do item.
+                    child: Text(category), // Texto de exibição.
+                  );
+                }).toList(), // Converte para lista.
+                onChanged: (String? newValue) { // Quando um novo valor é selecionado.
+                  if (newValue != null) { // Se o novo valor não for nulo.
+                    setState(() { // Atualiza o estado.
+                      _selectedCategory = newValue; // Define a categoria selecionada.
+                    });
+                  }
+                },
+                validator: (String? value) { // Validador.
+                  if (value == null || value.isEmpty) { // Se o valor for nulo ou vazio.
+                    return 'Selecione uma categoria.'; // Mensagem de erro.
+                  }
+                  return null; // Nulo se válido.
+                },
+              ),
+              const SizedBox(height: 16), // Espaçamento.
+              SwitchListTile( // Switch para "Requer Receita".
+                title: const Text('Requer Receita (Rx Only)'), // Título.
+                secondary: const Icon(Icons.medical_information), // Ícone secundário.
+                value: _rxOnly, // Valor do switch.
+                onChanged: (bool value) { // Quando o switch muda.
+                  setState(() { // Atualiza o estado.
+                    _rxOnly = value; // Define o novo valor de _rxOnly.
+                  });
+                },
+              ),
+              const SizedBox(height: 24), // Espaçamento.
+              SizedBox( // Garante que o botão ocupe toda a largura.
+                width: double.infinity, // Largura máxima.
+                child: ElevatedButton.icon( // Botão para salvar.
+                  onPressed: _saveProduct, // Chama o método para salvar.
+                  icon: const Icon(Icons.save), // Ícone de salvar.
+                  label: Text(widget.product == null ? 'Adicionar Produto' : 'Salvar Alterações'), // Texto dinâmico do botão.
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Cartão para exibição e gerenciamento de produtos na tela de administração.
+class ProductManagementCard extends ConsumerWidget { // Widget stateless que consome dados do Riverpod.
+  final Product product; // O produto a ser gerenciado.
+
+  const ProductManagementCard({super.key, required this.product}); // Construtor com parâmetro obrigatório.
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) { // Método de construção da UI.
+    return Card( // Cartão visual.
+      margin: const EdgeInsets.symmetric(vertical: 8.0), // Margem vertical.
+      elevation: 2, // Elevação.
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), // Borda arredondada.
+      child: Padding( // Preenchimento interno.
+        padding: const EdgeInsets.all(16.0), // Preenchimento.
+        child: Row( // Linha para imagem, detalhes e botões de ação.
+          children: <Widget>[ // Lista de filhos.
+            ClipRRect( // Recorta a imagem.
+              borderRadius: BorderRadius.circular(8.0), // Borda arredondada.
+              child: Image.network( // Imagem da rede.
+                product.imageUrl ?? 'https://www.gstatic.com/flutter-onestack-prototype/genui/example_1.jpg', // URL ou placeholder.
+                width: 60, // Largura.
+                height: 60, // Altura.
+                fit: BoxFit.cover, // Ajusta a imagem.
+                errorBuilder: (BuildContext context, Object error, StackTrace? stackTrace) => Container( // Construtor de erro.
+                  width: 60, // Largura.
+                  height: 60, // Altura.
+                  color: Colors.grey[200], // Cor de fundo.
+                  child: const Icon(Icons.image_not_supported, color: Colors.grey), // Ícone de erro.
+                ),
+              ),
+            ),
+            const SizedBox(width: 16.0), // Espaçamento.
+            Expanded( // Expande para preencher o espaço.
+              child: Column( // Coluna para nome, preço e status.
+                crossAxisAlignment: CrossAxisAlignment.start, // Alinha à esquerda.
+                children: <Widget>[ // Lista de filhos.
+                  Text(
+                    product.name, // Nome do produto.
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), // Estilo negrito.
+                    maxLines: 2, // Máximo de 2 linhas.
+                    overflow: TextOverflow.ellipsis, // '...'.
+                  ),
+                  Text(
+                    'R\$ ${product.price.toStringAsFixed(2)}', // Preço formatado.
+                    style: Theme.of(context).textTheme.titleSmall, // Estilo do texto.
+                  ),
+                  if (product.rxOnly) // Se requer receita.
+                    Padding( // Adiciona preenchimento.
+                      padding: const EdgeInsets.only(top: 4.0), // Preenchimento superior.
+                      child: Chip( // Chip de informação.
+                        label: const Text('Com receita', style: TextStyle(fontSize: 10, color: Colors.white)), // Texto do chip.
+                        backgroundColor: Colors.red[400], // Cor de fundo.
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, // Reduz área de toque.
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            IconButton( // Botão para editar.
+              icon: const Icon(Icons.edit, color: Colors.blue), // Ícone de edição.
+              onPressed: () { // Ação ao pressionar.
+                Navigator.of(context).push( // Navega para a tela de formulário de produto para edição.
+                  MaterialPageRoute<void>(
+                    builder: (BuildContext context) => ProductFormScreen(product: product), // Passa o produto para edição.
+                  ),
+                );
+              },
+            ),
+            IconButton( // Botão para deletar.
+              icon: const Icon(Icons.delete, color: Colors.red), // Ícone de lixeira.
+              onPressed: () { // Ação ao pressionar.
+                showDialog<void>( // Exibe um diálogo de confirmação.
+                  context: context,
+                  builder: (BuildContext dialogContext) => AlertDialog( // Diálogo de alerta.
+                    title: const Text('Confirmar Exclusão'), // Título.
+                    content: Text('Tem certeza de que deseja excluir "${product.name}"?'), // Mensagem de confirmação.
+                    actions: <Widget>[ // Ações do diálogo.
+                      TextButton( // Botão de cancelar.
+                        onPressed: () => Navigator.of(dialogContext).pop(), // Fecha o diálogo.
+                        child: const Text('Cancelar'), // Texto do botão.
+                      ),
+                      ElevatedButton( // Botão de excluir.
+                        onPressed: () { // Ação ao pressionar.
+                          ref.read(productProvider.notifier).deleteProduct(product.id); // Deleta o produto.
+                          ScaffoldMessenger.of(context).showSnackBar( // Exibe SnackBar.
+                            SnackBar(content: Text('${product.name} excluído.')), // Mensagem de exclusão.
+                          );
+                          Navigator.of(dialogContext).pop(); // Fecha o diálogo.
+                        },
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red), // Estilo vermelho.
+                        child: const Text('Excluir'), // Texto do botão.
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Tela para gerenciar produtos (CRUD).
+class ProductManagementScreen extends ConsumerWidget { // Widget stateless que consome dados do Riverpod.
+  const ProductManagementScreen({super.key}); // Construtor constante.
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) { // Método de construção da UI.
+    final List<Product> allProducts = ref.watch(productProvider); // Observa todos os produtos.
+
+    return Scaffold( // Estrutura básica da tela.
+      appBar: AppBar( // Barra superior.
+        title: const Text('Gerenciar Produtos'), // Título.
+      ),
+      body: allProducts.isEmpty // Se não houver produtos.
+          ? Center( // Centraliza o conteúdo.
+              child: Column( // Organiza em coluna.
+                mainAxisAlignment: MainAxisAlignment.center, // Centraliza verticalmente.
+                children: <Widget>[ // Lista de filhos.
+                  const Icon(Icons.inventory_2_outlined, size: 90, color: Colors.grey), // Ícone de inventário vazio.
+                  const SizedBox(height: 24), // Espaçamento.
+                  Text(
+                    'Nenhum produto cadastrado ainda.', // Mensagem.
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.grey[600]), // Estilo do texto.
+                  ),
+                  const SizedBox(height: 16), // Espaçamento.
+                  ElevatedButton( // Botão para adicionar o primeiro produto.
+                    onPressed: () { // Ação ao pressionar.
+                      Navigator.of(context).push( // Navega para a tela de formulário.
+                        MaterialPageRoute<void>(
+                          builder: (BuildContext context) => const ProductFormScreen(), // Constrói o formulário vazio.
+                        ),
+                      );
+                    },
+                    child: const Text('Adicionar Primeiro Produto'), // Texto do botão.
+                  ),
+                ],
+              ),
+            )
+          : ListView.builder( // Se houver produtos, exibe-os em uma lista.
+              padding: const EdgeInsets.all(16.0), // Preenchimento da lista.
+              itemCount: allProducts.length, // Número de produtos.
+              itemBuilder: (BuildContext context, int index) { // Construtor de itens.
+                final Product product = allProducts[index]; // Obtém o produto.
+                return ProductManagementCard(product: product); // Exibe o cartão de gerenciamento.
+              },
+            ),
+      floatingActionButton: FloatingActionButton( // Botão flutuante para adicionar produto.
+        onPressed: () { // Ação ao pressionar.
+          Navigator.of(context).push( // Navega para a tela de formulário.
+            MaterialPageRoute<void>(
+              builder: (BuildContext context) => const ProductFormScreen(), // Constrói o formulário vazio.
+            ),
+          );
+        },
+        child: const Icon(Icons.add), // Ícone de adicionar.
+      ),
+    );
+  }
+}
+
+/// Cartão de exibição para um único serviço.
+class ServiceCard extends ConsumerWidget { // Widget stateless que consome dados do Riverpod.
+  final Service service; // O serviço a ser exibido.
+
+  const ServiceCard({super.key, required this.service}); // Construtor com parâmetro obrigatório.
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) { // Método de construção da UI.
+    return Card( // Cartão visual.
+      margin: const EdgeInsets.symmetric(vertical: 8.0), // Margem vertical.
+      elevation: 2, // Elevação.
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), // Borda arredondada.
+      child: Padding( // Preenchimento interno.
+        padding: const EdgeInsets.all(16.0), // Preenchimento.
+        child: Column( // Organiza o conteúdo em coluna.
+          crossAxisAlignment: CrossAxisAlignment.start, // Alinha à esquerda.
+          children: <Widget>[ // Lista de filhos.
+            Row( // Linha para imagem e detalhes.
+              crossAxisAlignment: CrossAxisAlignment.start, // Alinha ao topo.
+              children: <Widget>[ // Lista de filhos.
+                ClipRRect( // Recorta a imagem.
+                  borderRadius: BorderRadius.circular(8.0), // Borda arredondada.
+                  child: Image.network( // Imagem da rede.
+                    service.imageUrl ?? 'https://www.gstatic.com/flutter-onestack-prototype/genui/example_1.jpg', // URL ou placeholder.
+                    width: 80, // Largura.
+                    height: 80, // Altura.
+                    fit: BoxFit.cover, // Ajusta a imagem.
+                    errorBuilder: (BuildContext context, Object error, StackTrace? stackTrace) => Container( // Construtor de erro.
+                      width: 80, // Largura.
+                      height: 80, // Altura.
+                      color: Colors.grey[200], // Cor de fundo.
+                      child: const Icon(Icons.image_not_supported, color: Colors.grey), // Ícone de erro.
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16.0), // Espaçamento.
+                Expanded( // Expande para preencher o espaço.
+                  child: Column( // Coluna para nome, descrição, preço e duração.
+                    crossAxisAlignment: CrossAxisAlignment.start, // Alinha à esquerda.
+                    children: <Widget>[ // Lista de filhos.
+                      Text(
+                        service.name, // Nome do serviço.
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), // Estilo negrito.
+                        maxLines: 2, // Máximo de 2 linhas.
+                        overflow: TextOverflow.ellipsis, // '...'.
+                      ),
+                      const SizedBox(height: 4.0), // Espaçamento.
+                      Text(
+                        service.description, // Descrição do serviço.
+                        style: Theme.of(context).textTheme.bodyMedium, // Estilo do texto.
+                        maxLines: 3, // Máximo de 3 linhas.
+                        overflow: TextOverflow.ellipsis, // '...'.
+                      ),
+                      const SizedBox(height: 8.0), // Espaçamento.
+                      Row( // Linha para preço e duração.
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween, // Espaço entre os filhos.
+                        children: <Widget>[ // Lista de filhos.
+                          Text(
+                            'R\$ ${service.price.toStringAsFixed(2)}', // Preço formatado.
+                            style: Theme.of(context)
+                                .textTheme.titleSmall?.copyWith(color: Colors.green[700], fontWeight: FontWeight.bold), // Estilo verde e negrito.
+                          ),
+                          Chip( // Chip de duração.
+                            label: Text('${service.durationMinutes} min', style: const TextStyle(fontSize: 12, color: Colors.white)), // Texto do chip.
+                            backgroundColor: Colors.blue[400], // Cor de fundo azul.
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, // Reduz área de toque.
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16.0), // Espaçamento.
+            SizedBox( // Garante que o botão ocupe toda a largura.
+              width: double.infinity, // Largura máxima.
+              child: ElevatedButton.icon( // Botão para agendar serviço.
+                icon: const Icon(Icons.calendar_month, size: 20), // Ícone de calendário.
+                label: const Text('Agendar Serviço', style: TextStyle(fontSize: 16)), // Texto do botão.
+                onPressed: () { // Ação ao pressionar.
+                  Navigator.of(context).push( // Navega para a tela de agendamento.
+                    MaterialPageRoute<void>(
+                      builder: (BuildContext context) => ReservationFormScreen(service: service), // Passa o serviço para o formulário.
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Tela para agendar um novo serviço.
+class ReservationFormScreen extends ConsumerStatefulWidget { // Widget Stateful para gerenciamento de estado local.
+  final Service service; // O serviço para o qual a reserva será feita.
+
+  const ReservationFormScreen({super.key, required this.service}); // Construtor com parâmetro obrigatório.
+
+  @override
+  ConsumerState<ReservationFormScreen> createState() => _ReservationFormScreenState(); // Cria o estado mutável.
+}
+
+class _ReservationFormScreenState extends ConsumerState<ReservationFormScreen> { // Estado do formulário de reserva.
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>(); // Chave global para o formulário.
+  late DateTime _selectedDate; // Data selecionada para a reserva.
+  late TimeOfDay _selectedTime; // Hora selecionada para a reserva.
+  final TextEditingController _notesController = TextEditingController(); // Controlador para as notas.
+
+  @override
+  void initState() { // Inicializa o estado.
+    super.initState(); // Chama o initState da superclasse.
+    final DateTime now = DateTime.now(); // Obtém a data e hora atuais.
+    _selectedDate = DateTime(now.year, now.month, now.day); // Define a data inicial como hoje.
+    _selectedTime = TimeOfDay.fromDateTime(now.add(const Duration(hours: 1))); // Define a hora inicial como 1 hora a partir de agora.
+  }
+
+  @override
+  void dispose() { // Libera os recursos do controlador.
+    _notesController.dispose(); // Descarta o controlador de notas.
+    super.dispose(); // Chama o dispose da superclasse.
+  }
+
+  Future<void> _pickDate(BuildContext context) async { // Método assíncrono para selecionar a data.
+    final DateTime? picked = await showDatePicker( // Exibe o seletor de data.
+      context: context, // Contexto.
+      initialDate: _selectedDate, // Data inicial.
+      firstDate: DateTime.now(), // Primeira data selecionável (hoje).
+      lastDate: DateTime.now().add(const Duration(days: 365)), // Última data selecionável (daqui a um ano).
+    );
+    if (picked != null && picked != _selectedDate) { // Se uma data foi selecionada e é diferente da atual.
+      setState(() { // Atualiza o estado.
+        _selectedDate = picked; // Define a nova data.
+      });
+    }
+  }
+
+  Future<void> _pickTime(BuildContext context) async { // Método assíncrono para selecionar a hora.
+    final TimeOfDay? picked = await showTimePicker( // Exibe o seletor de hora.
+      context: context, // Contexto.
+      initialTime: _selectedTime, // Hora inicial.
+    );
+    if (picked != null && picked != _selectedTime) { // Se uma hora foi selecionada e é diferente da atual.
+      setState(() { // Atualiza o estado.
+        _selectedTime = picked; // Define a nova hora.
+      });
+    }
+  }
+
+  void _submitReservation() { // Lógica para submeter a reserva.
+    if (_formKey.currentState!.validate()) { // Se o formulário for válido.
+      final UserProfile? currentUser = ref.read(authProvider).currentUser; // Obtém o usuário logado.
+      if (currentUser == null) { // Se não houver usuário logado.
+        ScaffoldMessenger.of(context).showSnackBar( // Exibe um SnackBar.
+          const SnackBar(content: Text('Você precisa estar logado para fazer uma reserva.')), // Mensagem.
+        );
+        return; // Sai da função.
+      }
+
+      final DateTime reservationDateTime = DateTime( // Constrói a data e hora completas da reserva.
+        _selectedDate.year, // Ano selecionado.
+        _selectedDate.month, // Mês selecionado.
+        _selectedDate.day, // Dia selecionado.
+        _selectedTime.hour, // Hora selecionada.
+        _selectedTime.minute, // Minuto selecionado.
+      );
+
+      if (reservationDateTime.isBefore(DateTime.now())) { // Se a data/hora da reserva for no passado.
+        ScaffoldMessenger.of(context).showSnackBar( // Exibe um SnackBar.
+          const SnackBar(content: Text('Não é possível agendar um serviço para o passado.')), // Mensagem.
+        );
+        return; // Sai da função.
+      }
+
+      final Reservation newReservation = Reservation( // Cria um novo objeto Reservation.
+        id: 0, // ID 0 (será gerado pelo controller).
+        userId: currentUser.id, // ID do usuário.
+        userName: currentUser.name, // Nome do usuário.
+        serviceId: widget.service.id, // ID do serviço.
+        serviceName: widget.service.name, // Nome do serviço.
+        reservationDateTime: reservationDateTime, // Data e hora da reserva.
+        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(), // Notas ou nulo se vazio.
+      );
+
+      ref.read(reservationProvider.notifier).makeReservation(newReservation); // Faz a reserva usando o controller.
+
+      ScaffoldMessenger.of(context).showSnackBar( // Exibe um SnackBar.
+        SnackBar(content: Text('Reserva para "${widget.service.name}" agendada com sucesso!')), // Mensagem de sucesso.
+      );
+      Navigator.of(context).pop(); // Volta para a tela anterior.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) { // Método de construção da UI.
+    return Scaffold( // Estrutura básica da tela.
+      appBar: AppBar( // Barra superior.
+        title: const Text('Agendar Serviço'), // Título.
+      ),
+      body: SingleChildScrollView( // Permite rolagem.
+        padding: const EdgeInsets.all(16.0), // Preenchimento.
+        child: Form( // Formulário para validação.
+          key: _formKey, // Associa a chave global.
+          child: Column( // Organiza em coluna.
+            crossAxisAlignment: CrossAxisAlignment.start, // Alinha à esquerda.
+            children: <Widget>[ // Lista de filhos.
+              Text(
+                'Serviço: ${widget.service.name}', // Nome do serviço.
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold), // Estilo negrito.
+              ),
+              const SizedBox(height: 8), // Espaçamento.
+              Text(
+                'Preço: R\$ ${widget.service.price.toStringAsFixed(2)} - Duração: ${widget.service.durationMinutes} minutos', // Preço e duração.
+                style: Theme.of(context).textTheme.titleMedium, // Estilo do texto.
+              ),
+              const SizedBox(height: 24), // Espaçamento.
+              ListTile( // Item de lista para a data.
+                leading: const Icon(Icons.calendar_today), // Ícone.
+                title: Text('Data selecionada: ${DateFormat('dd/MM/yyyy').format(_selectedDate)}'), // Data formatada.
+                trailing: const Icon(Icons.edit), // Ícone de edição.
+                onTap: () => _pickDate(context), // Ação para selecionar data.
+              ),
+              ListTile( // Item de lista para a hora.
+                leading: const Icon(Icons.access_time), // Ícone.
+                title: Text('Hora selecionada: ${_selectedTime.format(context)}'), // Hora formatada.
+                trailing: const Icon(Icons.edit), // Ícone de edição.
+                onTap: () => _pickTime(context), // Ação para selecionar hora.
+              ),
+              const SizedBox(height: 16), // Espaçamento.
+              TextFormField( // Campo de texto para observações.
+                controller: _notesController, // Associa o controlador.
+                decoration: const InputDecoration( // Decoração.
+                  labelText: 'Observações (opcional)', // Rótulo.
+                  prefixIcon: Icon(Icons.notes), // Ícone.
+                ),
+                maxLines: 3, // Máximo de 3 linhas.
+              ),
+              const SizedBox(height: 32), // Espaçamento.
+              SizedBox( // Garante que o botão ocupe toda a largura.
+                width: double.infinity, // Largura máxima.
+                child: ElevatedButton.icon( // Botão para confirmar agendamento.
+                  onPressed: _submitReservation, // Chama o método para submeter.
+                  icon: const Icon(Icons.check_circle), // Ícone de verificação.
+                  label: const Text('Confirmar Agendamento'), // Texto do botão.
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Cartão de exibição para uma reserva de usuário.
+class ReservationUserCard extends ConsumerWidget { // Widget stateless que consome dados do Riverpod.
+  final Reservation reservation; // A reserva a ser exibida.
+
+  const ReservationUserCard({super.key, required this.reservation}); // Construtor com parâmetro obrigatório.
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) { // Método de construção da UI.
+    final Service? service = ref.watch(serviceProvider.notifier).getServiceById(reservation.serviceId); // Obtém o serviço associado à reserva.
+
+    return Card( // Cartão visual.
+      margin: const EdgeInsets.symmetric(vertical: 8.0), // Margem vertical.
+      elevation: 2, // Elevação.
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), // Borda arredondada.
+      child: Padding( // Preenchimento interno.
+        padding: const EdgeInsets.all(16.0), // Preenchimento.
+        child: Column( // Organiza o conteúdo em coluna.
+          crossAxisAlignment: CrossAxisAlignment.start, // Alinha à esquerda.
+          children: <Widget>[ // Lista de filhos.
+            Row( // Linha para ícone e nome do serviço.
+              children: <Widget>[ // Lista de filhos.
+                Icon(reservation.status.icon, color: reservation.status.color), // Ícone do status com sua cor.
+                const SizedBox(width: 8), // Espaçamento.
+                Text(
+                  reservation.serviceName, // Nome do serviço.
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), // Estilo negrito.
+                  maxLines: 2, // Máximo de 2 linhas.
+                  overflow: TextOverflow.ellipsis, // '...'.
+                ),
+              ],
+            ),
+            const SizedBox(height: 8), // Espaçamento.
+            Text(
+              'Status: ${reservation.status.displayName}', // Nome de exibição do status.
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: reservation.status.color), // Estilo com cor do status.
+            ),
+            const SizedBox(height: 4), // Espaçamento.
+            Text(
+              'Data: ${DateFormat('dd/MM/yyyy').format(reservation.reservationDateTime)} às ${DateFormat('HH:mm').format(reservation.reservationDateTime)}', // Data e hora formatadas.
+              style: Theme.of(context).textTheme.bodyMedium, // Estilo do texto.
+            ),
+            if (service != null) // Se o serviço for encontrado.
+              Padding( // Adiciona preenchimento.
+                padding: const EdgeInsets.only(top: 4.0), // Preenchimento superior.
+                child: Text(
+                  'Duração estimada: ${service.durationMinutes} minutos', // Duração do serviço.
+                  style: Theme.of(context).textTheme.bodySmall, // Estilo de texto pequeno.
+                ),
+              ),
+            if (reservation.notes != null && reservation.notes!.isNotEmpty) ...<Widget>[ // Se houver notas.
+              const SizedBox(height: 8), // Espaçamento.
+              Text('Observações: ${reservation.notes}', style: Theme.of(context).textTheme.bodySmall), // Texto das observações.
+            ],
+            if (reservation.status == ReservationStatus.pending) // Se o status for pendente.
+              Align( // Alinha o botão.
+                alignment: Alignment.bottomRight, // Alinha ao canto inferior direito.
+                child: TextButton.icon( // Botão para cancelar reserva.
+                  icon: const Icon(Icons.cancel, color: Colors.red), // Ícone de cancelamento.
+                  label: const Text('Cancelar Reserva', style: TextStyle(color: Colors.red)), // Texto vermelho.
+                  onPressed: () { // Ação ao pressionar.
+                    showDialog<void>( // Exibe um diálogo de confirmação.
+                      context: context,
+                      builder: (BuildContext dialogContext) => AlertDialog( // Diálogo de alerta.
+                        title: const Text('Confirmar Cancelamento'), // Título.
+                        content: const Text('Tem certeza de que deseja cancelar esta reserva?'), // Mensagem de confirmação.
+                        actions: <Widget>[ // Ações do diálogo.
+                          TextButton( // Botão de cancelar.
+                            onPressed: () => Navigator.of(dialogContext).pop(), // Fecha o diálogo.
+                            child: const Text('Não'), // Texto do botão.
+                          ),
+                          ElevatedButton( // Botão de confirmar cancelamento.
+                            onPressed: () { // Ação ao pressionar.
+                              ref.read(reservationProvider.notifier).cancelReservation(reservation.id); // Cancela a reserva.
+                              ScaffoldMessenger.of(context).showSnackBar( // Exibe SnackBar.
+                                const SnackBar(content: Text('Reserva cancelada.')), // Mensagem.
+                              );
+                              Navigator.of(dialogContext).pop(); // Fecha o diálogo.
+                            },
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red), // Estilo vermelho.
+                            child: const Text('Sim, Cancelar'), // Texto do botão.
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Tela para exibir as reservas do usuário logado.
+class MyReservationsScreen extends ConsumerWidget { // Widget stateless que consome dados do Riverpod.
+  const MyReservationsScreen({super.key}); // Construtor constante.
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) { // Método de construção da UI.
+    final UserProfile? currentUser = ref.watch(authProvider).currentUser; // Observa o usuário logado.
+    if (currentUser == null) { // Se não houver usuário logado.
+      return Scaffold( // Estrutura básica da tela.
+        appBar: AppBar(title: const Text('Minhas Reservas')), // Barra superior.
+        body: const Center(child: Text('Nenhum usuário logado.')), // Mensagem de erro.
+      );
+    }
+
+    final List<Reservation> userReservations = // Obtém as reservas do usuário logado.
+        ref.watch(reservationProvider.notifier).getReservationsForUser(currentUser.id); // Filtra por ID do usuário.
+
+    return Scaffold( // Estrutura básica da tela.
+      appBar: AppBar( // Barra superior.
+        title: const Text('Minhas Reservas'), // Título.
+      ),
+      body: userReservations.isEmpty // Se não houver reservas.
+          ? Center( // Centraliza o conteúdo.
+              child: Column( // Organiza em coluna.
+                mainAxisAlignment: MainAxisAlignment.center, // Centraliza verticalmente.
+                children: <Widget>[ // Lista de filhos.
+                  const Icon(Icons.calendar_month, size: 90, color: Colors.grey), // Ícone de calendário.
+                  const SizedBox(height: 24), // Espaçamento.
+                  Text(
+                    'Você não tem nenhuma reserva ainda!', // Mensagem.
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.grey[600]), // Estilo do texto.
+                  ),
+                  const SizedBox(height: 16), // Espaçamento.
+                  ElevatedButton( // Botão para agendar um serviço.
+                    onPressed: () { // Ação ao pressionar.
+                      Navigator.of(context).pop(); // Volta para a tela anterior.
+                      // Ideally navigate to the services tab
+                    },
+                    child: const Text('Agendar um Serviço'), // Texto do botão.
+                  ),
+                ],
+              ),
+            )
+          : ListView.builder( // Se houver reservas, exibe-as em uma lista.
+              padding: const EdgeInsets.all(16.0), // Preenchimento da lista.
+              itemCount: userReservations.length, // Número de reservas.
+              itemBuilder: (BuildContext context, int index) { // Construtor de itens.
+                final Reservation reservation = userReservations[index]; // Obtém a reserva.
+                return ReservationUserCard(reservation: reservation); // Exibe o cartão da reserva.
+              },
+            ),
+    );
+  }
+}
+
+/// Cartão para exibição e gerenciamento de reservas na tela de administração.
+class AdminReservationCard extends ConsumerWidget { // Widget stateless que consome dados do Riverpod.
+  final Reservation reservation; // A reserva a ser gerenciada.
+
+  const AdminReservationCard({super.key, required this.reservation}); // Construtor com parâmetro obrigatório.
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) { // Método de construção da UI.
+    return Card( // Cartão visual.
+      margin: const EdgeInsets.symmetric(vertical: 8.0), // Margem vertical.
+      elevation: 2, // Elevação.
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), // Borda arredondada.
+      child: Padding( // Preenchimento interno.
+        padding: const EdgeInsets.all(16.0), // Preenchimento.
+        child: Column( // Organiza o conteúdo em coluna.
+          crossAxisAlignment: CrossAxisAlignment.start, // Alinha à esquerda.
+          children: <Widget>[ // Lista de filhos.
+            Row( // Linha para o nome do serviço e botão de exclusão.
+              mainAxisAlignment: MainAxisAlignment.spaceBetween, // Espaço entre os filhos.
+              children: <Widget>[ // Lista de filhos.
+                Text(
+                  'Serviço: ${reservation.serviceName}', // Nome do serviço.
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), // Estilo negrito.
+                ),
+                IconButton( // Botão de exclusão.
+                  icon: const Icon(Icons.delete, color: Colors.red), // Ícone de lixeira.
+                  onPressed: () { // Ação ao pressionar.
+                    showDialog<void>( // Exibe um diálogo de confirmação.
+                      context: context,
+                      builder: (BuildContext dialogContext) => AlertDialog( // Diálogo de alerta.
+                        title: const Text('Confirmar Exclusão'), // Título.
+                        content: Text('Tem certeza de que deseja excluir a reserva para "${reservation.serviceName}" de "${reservation.userName}"?'), // Mensagem de confirmação.
+                        actions: <Widget>[ // Ações do diálogo.
+                          TextButton( // Botão de cancelar.
+                            onPressed: () => Navigator.of(dialogContext).pop(), // Fecha o diálogo.
+                            child: const Text('Cancelar'), // Texto do botão.
+                          ),
+                          ElevatedButton( // Botão de excluir.
+                            onPressed: () { // Ação ao pressionar.
+                              ref.read(reservationProvider.notifier).updateReservationStatus(reservation.id, ReservationStatus.cancelled); // Marca como cancelado em vez de deletar.
+                              ScaffoldMessenger.of(context).showSnackBar( // Exibe SnackBar.
+                                const SnackBar(content: Text('Reserva cancelada pelo admin.')), // Mensagem.
+                              );
+                              Navigator.of(dialogContext).pop(); // Fecha o diálogo.
+                            },
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red), // Estilo vermelho.
+                            child: const Text('Excluir'), // Texto do botão.
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 4), // Espaçamento.
+            Text('Cliente: ${reservation.userName}', style: Theme.of(context).textTheme.bodyMedium), // Nome do cliente.
+            Text(
+              'Data/Hora: ${DateFormat('dd/MM/yyyy HH:mm').format(reservation.reservationDateTime)}', // Data e hora formatadas.
+              style: Theme.of(context).textTheme.bodyMedium, // Estilo do texto.
+            ),
+            if (reservation.notes != null && reservation.notes!.isNotEmpty) // Se houver notas.
+              Text('Notas: ${reservation.notes}', style: Theme.of(context).textTheme.bodySmall), // Texto das notas.
+            const SizedBox(height: 8), // Espaçamento.
+            Row( // Linha para o status e dropdown.
+              children: <Widget>[ // Lista de filhos.
+                Text('Status:', style: Theme.of(context).textTheme.bodyMedium), // Texto "Status:".
+                const SizedBox(width: 8), // Espaçamento.
+                DropdownButton<ReservationStatus>( // Dropdown para mudar o status da reserva.
+                  value: reservation.status, // Valor atual selecionado.
+                  onChanged: (ReservationStatus? newStatus) { // Quando um novo status é selecionado.
+                    if (newStatus != null) { // Se o novo status não for nulo.
+                      ref.read(reservationProvider.notifier).updateReservationStatus(reservation.id, newStatus); // Atualiza o status da reserva.
+                      ScaffoldMessenger.of(context).showSnackBar( // Exibe SnackBar.
+                        SnackBar(content: Text('Status da reserva atualizado para ${newStatus.displayName}')), // Mensagem de atualização.
+                      );
+                    }
+                  },
+                  items: ReservationStatus.values.map<DropdownMenuItem<ReservationStatus>>((ReservationStatus status) { // Mapeia os valores do enum para DropdownMenuItem.
+                    return DropdownMenuItem<ReservationStatus>( // Item do dropdown.
+                      value: status, // Valor do item.
+                      child: Row( // Linha para ícone e texto do status.
+                        children: <Widget>[ // Lista de filhos.
+                          Icon(status.icon, color: status.color, size: 20), // Ícone do status.
+                          const SizedBox(width: 8), // Espaçamento.
+                          Text(status.displayName), // Nome de exibição do status.
+                        ],
+                      ),
+                    );
+                  }).toList(), // Converte para lista.
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Tela para gerenciar todas as reservas (para administradores).
+class AdminReservationsScreen extends ConsumerWidget { // Widget stateless que consome dados do Riverpod.
+  const AdminReservationsScreen({super.key}); // Construtor constante.
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) { // Método de construção da UI.
+    final List<Reservation> allReservations = ref.watch(reservationProvider); // Observa todas as reservas.
+
+    return Scaffold( // Estrutura básica da tela.
+      appBar: AppBar( // Barra superior.
+        title: const Text('Gerenciar Reservas'), // Título.
+      ),
+      body: allReservations.isEmpty // Se não houver reservas.
+          ? Center( // Centraliza o conteúdo.
+              child: Column( // Organiza em coluna.
+                mainAxisAlignment: MainAxisAlignment.center, // Centraliza verticalmente.
+                children: <Widget>[ // Lista de filhos.
+                  const Icon(Icons.event_busy, size: 90, color: Colors.grey), // Ícone de eventos ocupados.
+                  const SizedBox(height: 24), // Espaçamento.
+                  Text(
+                    'Nenhuma reserva agendada ainda.', // Mensagem.
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.grey[600]), // Estilo do texto.
+                  ),
+                ],
+              ),
+            )
+          : ListView.builder( // Se houver reservas, exibe-as em uma lista.
+              padding: const EdgeInsets.all(16.0), // Preenchimento da lista.
+              itemCount: allReservations.length, // Número de reservas.
+              itemBuilder: (BuildContext context, int index) { // Construtor de itens.
+                final Reservation reservation = allReservations[index]; // Obtém a reserva.
+                return AdminReservationCard(reservation: reservation); // Exibe o cartão de gerenciamento de reserva.
+              },
+            ),
+    );
+  }
+}
+
+/// Tela principal da biblioteca do aplicativo, exibindo produtos por categoria e informações do usuário.
+class AppLibraryScreen extends ConsumerStatefulWidget { // Widget Stateful para gerenciamento de estado local com Riverpod.
+  /// Construtor para AppLibraryScreen.
+  const AppLibraryScreen({super.key}); // Construtor constante.
+
+  @override
+  ConsumerState<AppLibraryScreen> createState() => _AppLibraryScreenState(); // Cria o estado mutável.
+}
+
+class _AppLibraryScreenState extends ConsumerState<AppLibraryScreen> with SingleTickerProviderStateMixin { // Estado da tela da biblioteca.
+  late TabController _tabController; // Controlador para as abas.
+  static final List<String> _productCategories = ProductController.availableCategories; // Categorias de produtos.
+  static const String _servicesTab = 'Serviços'; // Nome da aba de serviços.
+  // Declare _allTabs as late final and initialize it in initState
+  late final List<String> _allTabs; // Lista de todas as abas.
+
+  bool _isLoading = true; // Added loading state // Estado de carregamento da tela.
+
+  @override
+  void initState() { // Inicializa o estado.
+    super.initState(); // Chama o initState da superclasse.
+    // Initialize _allTabs here
+    _allTabs = <String>[..._productCategories, _servicesTab]; // Combina categorias de produtos e a aba de serviços.
+    _tabController = TabController(length: _allTabs.length, vsync: this); // Inicializa o TabController.
+
+    // Simulate loading for 2 seconds
+    Future<void>.delayed(const Duration(seconds: 2), () { // Simula um atraso de 2 segundos.
+      if (mounted) { // Verifica se o widget ainda está montado.
+        setState(() { // Atualiza o estado.
+          _isLoading = false; // Define o carregamento como falso.
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() { // Libera os recursos do controlador.
+    _tabController.dispose(); // Descarta o TabController.
+    super.dispose(); // Chama o dispose da superclasse.
+  }
+
+  @override
+  Widget build(BuildContext context) { // Método de construção da UI.
+    final AuthState authState = ref.watch(authProvider); // Observa o estado de autenticação.
+    final UserProfile? currentUser = authState.currentUser; // Obtém o usuário logado.
+    final List<Product> allProducts = ref.watch(productProvider); // Observa todos os produtos.
+    final List<Service> allServices = ref.watch(serviceProvider); // Observa todos os serviços.
+    final int cartItemCount = ref.watch(cartProvider.notifier).getTotalQuantity(); // Obtém a contagem total de itens no carrinho.
+
+    if (currentUser == null) { // Se não houver usuário logado.
+      return Scaffold( // Estrutura básica da tela.
+        appBar: AppBar(title: const Text('Erro')), // Barra superior com título de erro.
+        body: Center( // Centraliza o conteúdo.
+          child: Column( // Organiza em coluna.
+            mainAxisAlignment: MainAxisAlignment.center, // Centraliza verticalmente.
+            children: <Widget>[ // Lista de filhos.
+              const Icon(Icons.error_outline, size: 60, color: Colors.red), // Ícone de erro.
+              const SizedBox(height: 16), // Espaçamento.
+              Text('Nenhum usuário logado.', style: Theme.of(context).textTheme.titleMedium), // Mensagem.
+              const SizedBox(height: 16), // Espaçamento.
+              ElevatedButton( // Botão para voltar.
+                onPressed: () { // Ação ao pressionar.
+                  Navigator.of(context).pop(); // Volta para a tela anterior.
+                },
+                child: const Text('Voltar'), // Texto do botão.
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final bool isAdmin = currentUser.email == AuthController._fixedUserEmail; // Verifica se o usuário é o administrador fixo.
+
+    return Scaffold( // Estrutura básica da tela.
+      appBar: AppBar( // Barra superior.
+        title: const Text('Biblioteca do Aplicativo'), // Título.
+        actions: <Widget>[ // Ações na barra superior (botões).
+          Stack( // Permite empilhar widgets (para o ícone do carrinho com contador).
+            children: <Widget>[ // Lista de filhos.
+              IconButton( // Botão do carrinho.
+                icon: const Icon(Icons.shopping_cart), // Ícone do carrinho.
+                onPressed: () { // Ação ao pressionar.
+                  Navigator.of(context).push( // Navega para a tela do carrinho.
+                    MaterialPageRoute<void>(
+                      builder: (BuildContext context) => const CartScreen(), // Constrói a tela do carrinho.
+                    ),
+                  );
+                },
+              ),
+              if (cartItemCount > 0) // Se houver itens no carrinho.
+                Positioned( // Posiciona o contador.
+                  right: 8, // 8 pixels da direita.
+                  top: 8, // 8 pixels do topo.
+                  child: Container( // Container para o contador.
+                    padding: const EdgeInsets.all(2), // Preenchimento.
+                    decoration: BoxDecoration( // Decoração.
+                      color: Colors.red, // Cor vermelha.
+                      borderRadius: BorderRadius.circular(10), // Borda arredondada.
+                    ),
+                    constraints: const BoxConstraints( // Restrições de tamanho.
+                      minWidth: 16, // Largura mínima.
+                      minHeight: 16, // Altura mínima.
+                    ),
+                    child: Text(
+                      '$cartItemCount', // Número de itens.
+                      style: const TextStyle( // Estilo do texto.
+                        color: Colors.white, // Cor branca.
+                        fontSize: 10, // Tamanho da fonte.
+                      ),
+                      textAlign: TextAlign.center, // Alinhamento central.
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          IconButton( // Botão de favoritos.
+            icon: const Icon(Icons.favorite), // Ícone de favorito.
+            onPressed: () { // Ação ao pressionar.
+              Navigator.of(context).push( // Navega para a tela de favoritos.
+                MaterialPageRoute<void>(
+                  builder: (BuildContext context) => const FavoritesScreen(), // Constrói a tela de favoritos.
+                ),
+              );
+            },
+            tooltip: 'Meus Favoritos', // Dica de ferramenta.
+          ),
+          IconButton( // Botão de minhas reservas.
+            icon: const Icon(Icons.calendar_month), // Ícone de calendário.
+            onPressed: () { // Ação ao pressionar.
+              Navigator.of(context).push( // Navega para a tela de minhas reservas.
+                MaterialPageRoute<void>(
+                  builder: (BuildContext context) => const MyReservationsScreen(), // Constrói a tela de minhas reservas.
+                ),
+              );
+            },
+            tooltip: 'Minhas Reservas', // Dica de ferramenta.
+          ),
+        ],
+        bottom: TabBar( // Barra de abas na parte inferior do AppBar.
+          controller: _tabController, // Associa o TabController.
+          tabs: _allTabs.map<Widget>((String category) => Tab(text: category)).toList(), // Mapeia as abas.
+          labelColor: Colors.white, // Cor do texto da aba selecionada.
+          unselectedLabelColor: Colors.white70, // Cor do texto da aba não selecionada.
+          indicatorColor: Colors.white, // Cor do indicador da aba.
+          isScrollable: true, // Permite rolagem das abas se houver muitas.
+        ),
+      ),
+      drawer: Drawer( // Gaveta lateral.
+        child: ListView( // Lista de itens na gaveta.
+          padding: EdgeInsets.zero, // Remove preenchimento padrão.
+          children: <Widget>[ // Lista de filhos.
+            DrawerHeader( // Cabeçalho da gaveta.
+              decoration: BoxDecoration( // Decoração do cabeçalho.
+                color: Theme.of(context).primaryColor, // Cor de fundo primária do tema.
+              ),
+              child: Column( // Organiza o conteúdo em coluna.
+                crossAxisAlignment: CrossAxisAlignment.start, // Alinha à esquerda.
+                mainAxisAlignment: MainAxisAlignment.end, // Alinha ao final verticalmente.
+                children: <Widget>[ // Lista de filhos.
+                  Text(
+                    currentUser.name, // Nome do usuário.
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white), // Estilo branco.
+                  ),
+                  Text(
+                    currentUser.email, // Email do usuário.
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white70), // Estilo branco com transparência.
+                  ),
+                ],
+              ),
+            ),
+            ListTile( // Item de lista para a página principal.
+              leading: const Icon(Icons.home), // Ícone.
+              title: const Text('Página Principal'), // Título.
+              onTap: () { // Ação ao tocar.
+                Navigator.of(context).pop(); // Close the drawer // Fecha a gaveta.
+                Navigator.of(context).pushReplacement( // Navega e substitui a tela.
+                  MaterialPageRoute<void>(
+                    builder: (BuildContext context) => const HomeScreen(), // Constrói a tela principal.
+                  ),
+                );
+              },
+            ),
+            ListTile( // Item de lista para o carrinho.
+              leading: const Icon(Icons.shopping_cart), // Ícone.
+              title: const Text('Meu Carrinho'), // Título.
+              onTap: () { // Ação ao tocar.
+                Navigator.of(context).pop(); // Close the drawer // Fecha a gaveta.
+                Navigator.of(context).push( // Navega para a tela do carrinho.
+                  MaterialPageRoute<void>(
+                    builder: (BuildContext context) => const CartScreen(), // Constrói a tela do carrinho.
+                  ),
+                );
+              },
+            ),
+            ListTile( // Item de lista para favoritos.
+              leading: const Icon(Icons.favorite), // Ícone.
+              title: const Text('Meus Favoritos'), // Título.
+              onTap: () { // Ação ao tocar.
+                Navigator.of(context).pop(); // Close the drawer // Fecha a gaveta.
+                Navigator.of(context).push( // Navega para a tela de favoritos.
+                  MaterialPageRoute<void>(
+                    builder: (BuildContext context) => const FavoritesScreen(), // Constrói a tela de favoritos.
+                  ),
+                );
+              },
+            ),
+            ListTile( // Item de lista para minhas reservas.
+              leading: const Icon(Icons.calendar_month), // Ícone.
+              title: const Text('Minhas Reservas'), // Título.
+              onTap: () { // Ação ao tocar.
+                Navigator.of(context).pop(); // Close the drawer // Fecha a gaveta.
+                Navigator.of(context).push( // Navega para a tela de minhas reservas.
+                  MaterialPageRoute<void>(
+                    builder: (BuildContext context) => const MyReservationsScreen(), // Constrói a tela de minhas reservas.
+                  ),
+                );
+              },
+            ),
+            if (isAdmin) // Se o usuário for administrador.
+              ListTile( // Item de lista para gerenciar produtos.
+                leading: const Icon(Icons.admin_panel_settings), // Ícone de administração.
+                title: const Text('Gerenciar Produtos'), // Título.
+                onTap: () { // Ação ao tocar.
+                  Navigator.of(context).pop(); // Close the drawer // Fecha a gaveta.
+                  Navigator.of(context).push( // Navega para a tela de gerenciamento de produtos.
+                    MaterialPageRoute<void>(
+                      builder: (BuildContext context) => const ProductManagementScreen(), // Constrói a tela de gerenciamento.
+                    ),
+                  );
+                },
+              ),
+            if (isAdmin) // Se o usuário for administrador.
+              ListTile( // Item de lista para gerenciar reservas.
+                leading: const Icon(Icons.event_note), // Ícone de nota de evento.
+                title: const Text('Gerenciar Reservas'), // Título.
+                onTap: () { // Ação ao tocar.
+                  Navigator.of(context).pop(); // Close the drawer // Fecha a gaveta.
+                  Navigator.of(context).push( // Navega para a tela de gerenciamento de reservas.
+                    MaterialPageRoute<void>(
+                      builder: (BuildContext context) => const AdminReservationsScreen(), // Constrói a tela de gerenciamento.
+                    ),
+                  );
+                },
+              ),
+            const Divider(), // Divisor visual.
+            ListTile( // Item de lista para sair.
+              leading: const Icon(Icons.logout, color: Colors.red), // Ícone de logout vermelho.
+              title: const Text('Sair', style: TextStyle(color: Colors.red)), // Texto "Sair" vermelho.
+              onTap: () { // Ação ao tocar.
+                ref.read(authProvider.notifier).logout(); // Chama o método de logout.
+                Navigator.of(context).pop(); // Close the drawer // Fecha a gaveta.
+              },
+            ),
+          ],
+        ),
+      ),
+      body: _isLoading // Se a tela estiver carregando.
+          ? Center( // Centraliza o conteúdo.
+              child: Column( // Organiza em coluna.
+                mainAxisAlignment: MainAxisAlignment.center, // Centraliza verticalmente.
+                children: <Widget>[ // Lista de filhos.
+                  const CircularProgressIndicator(), // Indicador de progresso circular.
+                  const SizedBox(height: 20), // Espaçamento.
+                  Text(
+                    'Carregando a biblioteca...', // Mensagem de carregamento.
+                    style: Theme.of(context).textTheme.titleLarge, // Estilo do texto.
+                  ),
+                ],
+              ),
+            )
+          : Column( // Se a tela não estiver carregando.
+              children: <Widget>[ // Lista de filhos.
+                Padding( // Adiciona preenchimento.
+                  padding: const EdgeInsets.all(16.0), // Preenchimento.
+                  child: Card( // Cartão de informações do usuário.
+                    elevation: 4, // Elevação.
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), // Borda arredondada.
+                    child: Padding( // Preenchimento interno.
+                      padding: const EdgeInsets.all(16.0), // Preenchimento.
+                      child: Column( // Organiza em coluna.
+                        crossAxisAlignment: CrossAxisAlignment.start, // Alinha à esquerda.
+                        children: <Widget>[ // Lista de filhos.
+                          Text(
+                            'Informações do Usuário:', // Título.
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold), // Estilo negrito.
+                          ),
+                          const SizedBox(height: 8), // Espaçamento.
+                          Row( // Linha para nome.
+                            children: <Widget>[ // Lista de filhos.
+                              const Icon(Icons.person, color: Colors.pinkAccent), // Ícone de pessoa.
+                              const SizedBox(width: 8), // Espaçamento.
+                              Text('Nome: ${currentUser.name}', style: Theme.of(context).textTheme.titleMedium), // Nome do usuário.
+                            ],
+                          ),
+                          const SizedBox(height: 4), // Espaçamento.
+                          Row( // Linha para ID.
+                            children: <Widget>[ // Lista de filhos.
+                              const Icon(Icons.badge, color: Colors.pinkAccent), // Ícone de crachá.
+                              const SizedBox(width: 8), // Espaçamento.
+                              Text('ID: ${currentUser.id}', style: Theme.of(context).textTheme.titleMedium), // ID do usuário.
+                            ],
+                          ),
+                          const SizedBox(height: 4), // Espaçamento.
+                          Row( // Linha para email.
+                            children: <Widget>[ // Lista de filhos.
+                              const Icon(Icons.email, color: Colors.pinkAccent), // Ícone de email.
+                              const SizedBox(width: 8), // Espaçamento.
+                              Text('Email: ${currentUser.email}', style: Theme.of(context).textTheme.titleMedium), // Email do usuário.
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded( // Expande a área para o TabBarView.
+                  child: TabBarView( // Conteúdo das abas.
+                    controller: _tabController, // Associa o TabController.
+                    children: _allTabs.map<Widget>((String tabName) { // Mapeia cada nome de aba para um widget.
+                      if (tabName == _servicesTab) { // Se a aba for de serviços.
+                        if (allServices.isEmpty) { // Se não houver serviços.
+                          return Center( // Centraliza a mensagem.
+                            child: Text('Nenhum serviço disponível.', style: Theme.of(context).textTheme.titleMedium), // Mensagem.
+                          );
+                        }
+                        return ListView.builder( // Constrói uma lista de serviços.
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0), // Preenchimento.
+                          itemCount: allServices.length, // Número de serviços.
+                          itemBuilder: (BuildContext context, int index) { // Construtor de itens.
+                            final Service service = allServices[index]; // Obtém o serviço.
+                            return ServiceCard(service: service); // Exibe o cartão do serviço.
+                          },
+                        );
+                      } else { // Se a aba for de categorias de produtos.
+                        final List<Product> categoryProducts = allProducts.where((Product p) => p.category == tabName).toList(); // Filtra produtos pela categoria.
+                        if (categoryProducts.isEmpty) { // Se não houver produtos na categoria.
+                          return Center( // Centraliza a mensagem.
+                            child: Text('Nenhum item encontrado na categoria "$tabName".', style: Theme.of(context).textTheme.titleMedium), // Mensagem.
+                          );
+                        }
+                        return ListView.builder( // Constrói uma lista de produtos.
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0), // Preenchimento.
+                          itemCount: categoryProducts.length, // Número de produtos na categoria.
+                          itemBuilder: (BuildContext context, int index) { // Construtor de itens.
+                            final Product product = categoryProducts[index]; // Obtém o produto.
+                            return ProductCard(product: product); // Exibe o cartão do produto.
+                          },
+                        );
+                      }
+                    }).toList(), // Converte para lista de widgets.
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+/// Tela principal exibida após o login bem-sucedido.
+class HomeScreen extends ConsumerWidget { // Widget stateless que consome dados do Riverpod.
+  /// Construtor para HomeScreen.
+  const HomeScreen({super.key}); // Construtor constante.
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) { // Método de construção da UI.
+    final AuthState authState = ref.watch(authProvider); // Observa o estado de autenticação.
+    final UserProfile? currentUser = authState.currentUser; // Obtém o usuário logado.
+
+    return Scaffold( // Estrutura básica da tela.
+      appBar: AppBar( // Barra superior.
+        title: const Text('Página Principal'), // Título.
+        actions: <Widget>[ // Ações na barra superior.
+          IconButton( // Botão de logout.
+            icon: const Icon(Icons.logout), // Ícone de logout.
+            onPressed: () { // Ação ao pressionar.
+              ref.read(authProvider.notifier).logout(); // Chama o método de logout.
+            },
+            tooltip: 'Sair', // Dica de ferramenta.
+          ),
+        ],
+      ),
+      body: Center( // Centraliza o conteúdo.
+        child: Column( // Organiza em coluna.
+          mainAxisAlignment: MainAxisAlignment.center, // Centraliza verticalmente.
+          children: <Widget>[ // Lista de filhos.
+            const Icon(Icons.check_circle_outline, size: 90, color: Colors.green), // Ícone de sucesso.
+            const SizedBox(height: 32.0), // Espaçamento.
+            Text(
+              'Você está logado!', // Mensagem de login.
+              style: Theme.of(context).textTheme.headlineSmall, // Estilo do texto.
+            ),
+            const SizedBox(height: 12.0), // Espaçamento.
+            Text(
+              'Bem-vindo de volta, ${currentUser?.name ?? 'usuário'}!', // Mensagem de boas-vindas com o nome do usuário.
+              style: Theme.of(context).textTheme.titleMedium, // Estilo do texto.
+            ),
+            const SizedBox(height: 32.0), // Espaçamento.
+            ElevatedButton.icon( // Botão para ir para o aplicativo.
+              onPressed: () { // Ação ao pressionar.
+                Navigator.of(context).push( // Navega para a tela da biblioteca do aplicativo.
+                  MaterialPageRoute<void>(
+                    builder: (BuildContext context) => const AppLibraryScreen(), // Constrói a tela da biblioteca.
+                  ),
+                );
+              },
+              icon: const Icon(Icons.apps), // Ícone de aplicativos.
+              label: const Text('Ir para o App'), // Texto do botão.
+            ),
+            const SizedBox(height: 16.0), // Espaçamento.
+            TextButton( // Botão para sair da conta.
+              onPressed: () { // Ação ao pressionar.
+                ref.read(authProvider.notifier).logout(); // Chama o método de logout.
+              },
+              child: const Text('Sair da Conta'), // Texto do botão.
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Widget que verifica o estado de autenticação e exibe a tela apropriada.
+class AuthChecker extends ConsumerWidget { // Widget stateless que consome dados do Riverpod.
+  /// Construtor para AuthChecker.
+  const AuthChecker({super.key}); // Construtor constante.
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) { // Método de construção da UI.
+    final AuthState authState = ref.watch(authProvider); // Observa o estado de autenticação.
+
+    if (authState.isAuthed) { // Se o usuário estiver autenticado.
+      return const HomeScreen(); // Retorna a tela principal.
+    } else { // Se o usuário não estiver autenticado.
+      return const LoginScreen(); // Retorna a tela de login.
+    }
+  }
+}
+
+/// O widget raiz da aplicação Flutter.
+class MyApp extends StatelessWidget { // Widget stateless raiz da aplicação.
+  /// Construtor para MyApp.
+  const MyApp({super.key}); // Construtor constante.
+
+  @override
+  Widget build(BuildContext context) { // Método de construção da UI.
+    return MaterialApp( // Widget principal do Material Design.
+      title: 'VetApp', // Título da aplicação (usado pelo sistema operacional).
+      debugShowCheckedModeBanner: false, // Oculta a faixa de "Debug".
+      theme: ThemeData( // Define o tema da aplicação.
+        primarySwatch: Colors.pink, // Define a paleta de cores primárias baseada no rosa.
+        visualDensity: VisualDensity.adaptivePlatformDensity, // Adapta a densidade visual à plataforma.
+        appBarTheme: const AppBarTheme( // Tema para a AppBar.
+          backgroundColor: Colors.pinkAccent, // Cor de fundo da AppBar.
+          foregroundColor: Colors.white, // Cor do texto e ícones na AppBar.
+          centerTitle: true, // Centraliza o título.
+          titleTextStyle: TextStyle( // Estilo do texto do título.
+            fontSize: 20, // Tamanho da fonte.
+            fontWeight: FontWeight.bold, // Negrito.
+            color: Colors.white, // Cor branca.
+          ),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData( // Tema para botões elevados.
+          style: ElevatedButton.styleFrom( // Estilo padrão para botões elevados.
+            backgroundColor: Colors.pinkAccent, // Cor de fundo.
+            foregroundColor: Colors.white, // Cor do texto.
+            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15), // Preenchimento.
+            textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold), // Estilo do texto.
+            shape: RoundedRectangleBorder( // Forma da borda.
+              borderRadius: BorderRadius.circular(10), // Borda arredondada.
+            ),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme( // Tema para decoração de campos de entrada.
+          border: OutlineInputBorder( // Borda padrão.
+            borderRadius: BorderRadius.circular(10), // Borda arredondada.
+            borderSide: BorderSide.none, // Sem borda.
+          ),
+          focusedBorder: OutlineInputBorder( // Borda quando o campo está focado.
+            borderRadius: BorderRadius.circular(10), // Borda arredondada.
+            borderSide: const BorderSide(color: Colors.pinkAccent, width: 2), // Borda rosa com 2px de largura.
+          ),
+          errorBorder: OutlineInputBorder( // Borda quando há erro.
+            borderRadius: BorderRadius.circular(10), // Borda arredondada.
+            borderSide: const BorderSide(color: Colors.pink, width: 2), // Borda rosa com 2px de largura.
+          ),
+          focusedErrorBorder: OutlineInputBorder( // Borda quando há erro e está focado.
+            borderRadius: BorderRadius.circular(10), // Borda arredondada.
+            borderSide: const BorderSide(color: Colors.pink, width: 2), // Borda rosa com 2px de largura.
+          ),
+          filled: true, // Campo preenchido.
+          fillColor: Colors.pink.withOpacity(0.08), // Cor de preenchimento rosa com opacidade.
+          contentPadding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 16.0), // Preenchimento do conteúdo.
+          labelStyle: TextStyle(color: Colors.grey[700]), // Estilo do rótulo.
+          hintStyle: TextStyle(color: Colors.grey[400]), // Estilo do texto de dica.
+          prefixIconColor: Colors.pinkAccent, // Cor dos ícones de prefixo.
+          errorStyle: const TextStyle(color: Colors.pink, fontSize: 14), // Estilo do texto de erro.
+        ),
+        textTheme: const TextTheme( // Tema para os textos.
+          headlineMedium: TextStyle(color: Colors.black87), // Estilo para headlineMedium.
+          headlineSmall: TextStyle(color: Colors.black87), // Estilo para headlineSmall.
+          titleMedium: TextStyle(color: Colors.black54), // Estilo para titleMedium.
+          titleSmall: TextStyle(color: Colors.black87), // Estilo para titleSmall.
+          titleLarge: TextStyle(color: Colors.black87), // Estilo para titleLarge.
+          bodyMedium: TextStyle(color: Colors.black54), // Estilo para bodyMedium.
+        ),
+      ),
+      home: const AuthChecker(), // O widget inicial da aplicação, que verifica a autenticação.
+    );
+  }
+}
+
+/// Função principal que inicia a aplicação Flutter.
+void main() { // Função de entrada principal do programa Dart.
+  runApp( // Inicia a execução do aplicativo Flutter.
+    const ProviderScope( // Um widget necessário para usar o Riverpod.
+      child: MyApp(), // O widget raiz da sua aplicação.
+    ),
+  );
+}
